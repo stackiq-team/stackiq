@@ -1,0 +1,88 @@
+name: Move closed issues to Terminée
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  move-to-terminee:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Move issue to Terminée
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.ACTIONS_TOKEN }}
+          script: |
+            const orgLogin = context.repo.owner;
+            const projectNumber = 1;
+
+            // Get project and Status field info
+            const projectQuery = `
+              query($login: String!, $number: Int!) {
+                organization(login: $login) {
+                  projectV2(number: $number) {
+                    id
+                    fields(first: 20) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options { id name }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+            const data = await github.graphql(projectQuery, { login: orgLogin, number: projectNumber });
+            const project = data.organization.projectV2;
+            const projectId = project.id;
+
+            const statusField = project.fields.nodes.find(f => f && f.name === "Status");
+            if (!statusField) throw new Error("No Status field found in project");
+            const termineeOption = statusField.options.find(o => o.name === "Terminée");
+            if (!termineeOption) throw new Error("No 'Terminée' option found in Status field");
+
+            // Get the project item for this issue
+            const itemQuery = `
+              query($contentId: ID!) {
+                node(id: $contentId) {
+                  ... on Issue {
+                    projectItems(first: 10) {
+                      nodes { id project { id } }
+                    }
+                  }
+                }
+              }
+            `;
+            const itemVars = { contentId: context.payload.issue.node_id };
+            const itemData = await github.graphql(itemQuery, itemVars);
+            const item = itemData.node.projectItems.nodes.find(i => i.project.id === projectId);
+            if (!item) throw new Error("Issue not found in project");
+
+            // Update the Status to "Terminée"
+            const updateMutation = `
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(
+                  input: {
+                    projectId: $projectId,
+                    itemId: $itemId,
+                    fieldId: $fieldId,
+                    value: { singleSelectOptionId: $optionId }
+                  }
+                ) {
+                  projectV2Item { id }
+                }
+              }
+            `;
+            await github.graphql(updateMutation, {
+              projectId,
+              itemId: item.id,
+              fieldId: statusField.id,
+              optionId: termineeOption.id
+            });
+            core.info("Issue moved to Terminée");
