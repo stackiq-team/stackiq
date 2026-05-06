@@ -1,38 +1,80 @@
----
-name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
-assignees: ''
+name: "Rapport de bug"
+description: "Il y a un problème dans l'application"
+title: "bug: <titre court>"
+labels: ["bug"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Résumé
+      placeholder: Court résumé de la problèmatique
+    validations:
+      required: true
 
----
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire
+      description: Soyez précis. Incluez données de test ou commandes si utile.
+      placeholder: |
+        1. Première étape
+        2. Deuxième étape
+        3. Troisième étape
+        ...
+    validations:
+      required: true
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportement attendu
+      placeholder: L'application devrait faire ceci...
+    validations:
+      required: true
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+  - type: textarea
+    id: actual
+    attributes:
+      label: Comportement observé
+      placeholder: L'application agit de cette manière présentement...
+    validations:
+      required: true
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+  - type: textarea
+    id: env
+    attributes:
+      label: Environnement
+      description: L'appareil, l'OS, le navigateur et la version de l'application
+      placeholder: |
+        Appareil: Iphone, ordinateur windows, mac, etc.
+        OS: iOS 26, Windows 11, macOS 7, etc.
+        Navigateur: Chrome, firefox, safari, etc.
+        Version (et commit si possible) de l'applicaiton:
+    validations:
+      required: true
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / traces
+      description: Collez les logs pertinents (masquez les secrets). Utilisez des blocs de code.
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priorité
+      options: ["P0 - critique", "P1 - haute", "P2 - moyenne", "P3 - faible"]
+      default: 2
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+  - type: checkboxes
+    id: regression
+    attributes:
+      label: Régression ?
+      options:
+        - label: Fonctionnait dans une version précédente
+        - label: Reproductible de manière fiable
 
-**Additional context**
-Add any other context about the problem here.
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Captures d'écran / enregistrements (optionnel)
