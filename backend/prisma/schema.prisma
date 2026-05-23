@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum DependencyType {
+  DEPENDENCY
+  DEV_DEPENDENCY
+}
+
+model Stack {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  dependencies Dependency[]
+  analyses     Analysis[]
+
+  @@map("stacks")
+}
+
+model Dependency {
+  id                 String         @id @default(uuid()) @db.Uuid
+  stackId            String         @map("stack_id") @db.Uuid
+  name               String
+  versionRequirement String         @map("version_requirement")
+  type               DependencyType
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  stack Stack @relation(fields: [stackId], references: [id], onDelete: Cascade)
+
+  @@unique([stackId, name, type])
+  @@index([stackId])
+  @@map("dependencies")
+}
+
+model Analysis {
+  id           String         @id @default(uuid()) @db.Uuid
+  stackId      String         @map("stack_id") @db.Uuid
+  status       AnalysisStatus @default(PENDING)
+  resultToken  String         @unique @default(uuid()) @map("result_token") @db.Uuid
+  errorMessage String?        @map("error_message")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  stack Stack @relation(fields: [stackId], references: [id], onDelete: Cascade)
+
+  @@index([stackId, status])
+  @@map("analyses")
+}
