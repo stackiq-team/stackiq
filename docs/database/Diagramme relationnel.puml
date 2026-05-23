@@ -1,0 +1,50 @@
+@startuml
+title Diagramme relationnel - StackIQ Sprint 1
+
+entity "stacks" as Stack {
+  * id : UUID
+  --
+  name : String
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+entity "dependencies" as Dependency {
+  * id : UUID
+  --
+  stack_id : UUID <<FK>>
+  name : String
+  version_requirement : String
+  type : DependencyType
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+entity "analyses" as Analysis {
+  * id : UUID
+  --
+  stack_id : UUID <<FK>>
+  status : AnalysisStatus
+  result_token : UUID
+  error_message : String?
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+Stack ||--o{ Dependency : contient
+Stack ||--o{ Analysis : possède
+
+note right of Dependency
+Contrainte unique :
+(stack_id, name, type)
+end note
+
+note right of Analysis
+status :
+PENDING
+PROCESSING
+COMPLETED
+FAILED
+end note
+
+@enduml

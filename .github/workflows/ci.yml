@@ -27,7 +27,7 @@ jobs:
         working-directory: backend
 
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/stackiq
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stackiq?schema=public
 
     steps:
       - name: Checkout
@@ -41,11 +41,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Generate Prisma client
+        run: npm run db:generate
+
       - name: Type check
         run: npx tsc --noEmit
 
       - name: Run migrations
-        run: npm run migrate
+        run: npm run db:migrate:deploy
+
+      - name: Validate Prisma setup
+        run: npm test
 
       - name: Start server in background
         run: |
