@@ -1,5 +1,5 @@
 @startuml
-title Diagramme relationnel - StackIQ Sprint 1
+title Diagramme relationnel
 
 entity "stacks" as Stack {
   * id : UUID
