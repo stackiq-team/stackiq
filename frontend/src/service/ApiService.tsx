@@ -19,7 +19,7 @@ export async function sendJsonForAnalysis(
     formData.append("file", file);
 
     const response = await fetch(
-      `${API_BASE_URL}/analyse/json`,
+      `${API_BASE_URL}/stack/create`,
       {
         method: "POST",
         body: formData,

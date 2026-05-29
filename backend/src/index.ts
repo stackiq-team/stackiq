@@ -1,12 +1,13 @@
 import express from "express";
 import cors from "cors";
 import { connectDB } from "./db/client";
+import stackRoutes from "./api/route/stack";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
+app.use("/stack", stackRoutes);
 app.get("/health", (req, res) => {
     res.json({ status: "ok" });
 });
@@ -21,3 +22,5 @@ async function start() {
 }
 
 start();
+
+export default app;
