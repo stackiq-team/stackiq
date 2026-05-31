@@ -1,14 +1,35 @@
 import express from "express";
 import cors from "cors";
-import { connectDB } from "./db/client";
+import { connectDB, prisma } from "./db/client";
+import { redis } from "./redis/client";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-app.get("/health", (req, res) => {
-    res.json({ status: "ok" });
+app.get("/health", async (req, res) => {
+    const health: Record<string, string> = { status: "ok" };
+
+    // Check Postgres
+    try {
+        await prisma.$queryRaw`SELECT 1`
+        health.postgres = "ok"
+    } catch {
+        health.postgres = "error"
+        health.status = "degraded"
+    }
+
+    // Check Redis
+    try {
+        await redis.ping()
+        health.redis = "ok"
+    } catch {
+        health.redis = "error"
+        health.status = "degraded"
+    }
+
+    res.json(health);
 });
 
 async function start() {
