@@ -4,7 +4,7 @@ on:
   pull_request:
 
 jobs:
-  integration:
+  backend:
     runs-on: ubuntu-latest
 
     services:
@@ -61,8 +61,8 @@ jobs:
       - name: Run migrations
         run: npm run db:migrate:deploy
 
-      - name: Validate Prisma setup
-        run: npm test
+      - name: Run tests with coverage
+        run: npm run test:coverage
 
       - name: Start server in background
         run: |
