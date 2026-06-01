@@ -8,10 +8,7 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
 });
-router.get(
-  "/",  async (req: Request, res: Response) => {
-    return "test";
-  })
+
 router.post(
   "/create",
   upload.single("file"),
@@ -68,9 +65,9 @@ router.post(
         message: "Success",
         stack,
       });
-    } catch (error) {
+    } catch (error:any) {
       return res.status(500).json({
-        message: "Internal server error",
+        message: error.message,
       });
     }
   }

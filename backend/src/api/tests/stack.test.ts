@@ -1,6 +1,7 @@
 import request from "supertest";
 import app from "../../index";
 import { prisma } from "../../db/client";
+import { describe, it, expect, vi, afterAll } from 'vitest'
 
 describe("POST /stack/create", () => {
   afterAll(async () => {
@@ -30,10 +31,10 @@ describe("POST /stack/create", () => {
       );
 
     //response assertions
-    expect(response.statusCode).toBe(200);
     expect(response.body.message).toBe("Success");
     expect(response.body.stack).toBeDefined();
     expect(response.body.stack.name).toBe("test@example.com");
+    expect(response.statusCode).toBe(200);
 
     //database assertions 
     const stackInDb = await prisma.stack.findFirst({
