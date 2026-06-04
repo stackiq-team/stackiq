@@ -1,0 +1,81 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 40px auto;
+  font-family: Arial, sans-serif;
+}
+
+.dropZone {
+  border: 2px dashed;
+  border-radius: 12px;
+  padding: 50px;
+  text-align: center;
+  cursor: pointer;
+  transition: 0.2s;
+  position: relative;
+}
+
+.input {
+  display: none;
+}
+
+.label {
+  cursor: pointer;
+  font-size: 18px;
+  color: #444;
+}
+
+.success {
+  margin-top: 20px;
+  color: green;
+}
+
+.error {
+  margin-top: 20px;
+  color: red;
+}
+
+.preview {
+  margin-top: 20px;
+  background: #111;
+  color: rgb(255, 189, 21);
+  padding: 20px;
+  border-radius: 10px;
+  overflow-x: auto;
+  max-height: 800px;
+}
+
+
+.emailSection {
+  margin-bottom: 24px;
+  margin-top: 100px;
+}
+
+.emailLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #333;
+}
+
+.emailInput {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.emailInput:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.inputError {
+  border-color: red;
+}

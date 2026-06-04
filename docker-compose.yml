@@ -51,7 +51,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-stackiq}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-65432}:65432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
