@@ -15,9 +15,9 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: stackiq
         ports:
-          - 65432:65432
+          - 65432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres"
+          --health-cmd="pg_isready -U postgres -d stackiq"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -43,6 +43,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Wait for PostgreSQL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+          for i in {1..30}; do
+            if pg_isready -h localhost -p 65432 -U postgres -d stackiq; then
+              echo "PostgreSQL is ready"
+              exit 0
+            fi
+
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 1
+          done
+
+          echo "PostgreSQL failed to start"
+          exit 1
 
       - name: Setup Node
         uses: actions/setup-node@v4
