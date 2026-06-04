@@ -15,7 +15,9 @@ Sprint 1 focuses on the minimal end-to-end flow:
 
 - Frontend: React with Vite
 - Backend: Node.js, Express, TypeScript
+- Worker: Node.js, TypeScript, BullMQ
 - Database: PostgreSQL
+- Cache/queue: Redis
 - ORM: Prisma
 - Containers: Docker and Docker Compose
 
@@ -24,8 +26,9 @@ Sprint 1 focuses on the minimal end-to-end flow:
 Install and start:
 
 - Docker Desktop
-- Docker Compose
-- Node.js, if running backend commands outside Docker
+- Node.js
+
+Docker must be running before you use the commands below.
 
 ## Environment
 
@@ -35,152 +38,118 @@ Create a local `.env` file from the example:
 copy .env.example .env
 ```
 
-The root `.env` file contains the database settings used by Docker and Prisma.
+For local development, these values are enough:
+
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=stackiq
+POSTGRES_PORT=55432
+DATABASE_URL=postgresql://postgres:postgres@db:5432/stackiq?schema=public
+REDIS_URL=redis://redis:6379
+BULLMQ_QUEUE_NAME=stackiq-analysis
+BACKEND_PORT=4000
+FRONTEND_PORT=5173
+```
+
 Do not commit real passwords or production connection strings.
 
-```env
-POSTGRES_USER=<database-user>
-POSTGRES_PASSWORD=<database-password>
-POSTGRES_DB=<database-name>
-POSTGRES_PORT=<host-port>
-DATABASE_URL=postgresql://<database-user>:<database-password>@db:5432/<database-name>?schema=public
-```
-
-Inside Docker, the database host is `db`.
-
-If you run Prisma directly from your host machine instead of inside Docker, use `localhost`:
-
-```env
-DATABASE_URL=postgresql://<database-user>:<database-password>@localhost:<host-port>/<database-name>?schema=public
-```
-
-## Start The Database
+## Run Everything
 
 From the project root:
 
 ```powershell
 cd c:\Users\mazig\PFE\stackiq
-docker compose up -d db
 ```
 
-Check that the database is running:
+If this is your first time running the project, or you want a completely clean setup, run:
 
 ```powershell
-docker compose ps
+npm run clean-start
 ```
 
-The `db` service should show as healthy.
+This recreates the local database/Redis data, rebuilds the services, runs the Prisma migrations, and starts the full app.
 
-## Build The Prisma Tables
-
-Run the Prisma migration inside the backend container:
-
-```powershell
-docker compose run --rm backend npm run db:migrate
-```
-
-This creates the Sprint 1 tables:
-
-- `stacks`
-- `dependencies`
-- `analyses`
-- `_prisma_migrations`
-
-## Check The Tables
-
-```powershell
-docker compose exec db psql -U postgres -d stackiq -c "\dt"
-```
-
-You can also inspect a table:
-
-```powershell
-docker compose exec db psql -U postgres -d stackiq -c "\d analyses"
-```
-
-## Prisma Commands
-
-Recommended: run Prisma through Docker Compose from the project root. This uses the Docker database host `db` from `DATABASE_URL`.
-
-Use these commands when you want Prisma to prepare or validate the database layer:
-
-```powershell
-docker compose run --rm backend npm run db:generate
-docker compose run --rm backend npm run db:migrate
-docker compose run --rm backend npm test
-```
-
-What they do:
-
-- `db:generate`: generates the TypeScript Prisma client from `backend/prisma/schema.prisma`. Run this after changing the Prisma schema.
-- `db:migrate`: applies Prisma migrations to PostgreSQL and creates or updates the database tables. Run this when setting up the database or after changing models.
-- `npm test`: runs the Prisma validation script. It checks the database connection, applied migrations, CRUD operations, and relations between `Stack`, `Dependency`, and `Analysis`.
-
-Alternative: run Prisma directly from `backend/` on your host machine. For this option, first make sure `DATABASE_URL` uses `localhost` instead of `db`, then run:
-
-```powershell
-npm run db:generate
-npm run db:migrate
-npm test
-```
-
-## Validate The Database Setup
-
-After migrations run:
-
-```powershell
-docker compose run --rm backend npm test
-```
-
-The validation checks:
-
-- Prisma can connect to PostgreSQL
-- migrations were applied
-- a `Stack` can be created
-- `Dependency` records can be created for dependencies and devDependencies
-- an `Analysis` can be created and moved from `PENDING` to `PROCESSING`
-- relationships between stack, dependencies, and analyses work
-
-## Reset The Development Database
-
-Use this when you want to drop and recreate the schema in development:
-
-```powershell
-docker compose run --rm backend npm run db:reset
-```
-
-To remove the PostgreSQL Docker volume completely:
-
-```powershell
-docker compose down -v
-docker compose up -d db
-docker compose run --rm backend npm run db:migrate
-```
-
-Only use `down -v` for local development because it deletes the database volume.
-
-## Run The Project
-
-Start all services:
-
-```powershell
-docker compose up -d
-```
-
-Backend:
+After it finishes, open:
 
 ```text
-http://localhost:4000
+Frontend: http://localhost:5173
+Backend:  http://localhost:4000
+Health:   http://localhost:4000/health
 ```
 
-Frontend:
-
-```text
-http://localhost:5173
-```
-
-Health check:
+For normal daily startup after the project has already been created once, run:
 
 ```powershell
-curl http://localhost:4000/health
+npm start
 ```
+
+`npm start` keeps your existing local database and Redis data.
+
+## Command Scripts
+
+### `npm start`
+
+Starts all services using the existing local data.
+
+Use this for normal development when you do not want to reset the database.
+
+Services started:
+
+- frontend
+- backend
+- worker
+- PostgreSQL
+- Redis
+
+### `npm run clean-start`
+
+Resets and recreates the whole project.
+
+Use this when you want a clean local environment. It deletes the local PostgreSQL and Redis Docker volumes, rebuilds all services, runs the Prisma migrations, and starts everything again.
+
+This command deletes local development data.
+
+### `npm run clean-start:frontend`
+
+Resets only the frontend service.
+
+Use this when the Vite/React app needs a clean rebuild but the backend, worker, database, and Redis can stay as they are.
+
+### `npm run clean-start:backend`
+
+Resets only the backend service.
+
+Use this when the API needs a clean rebuild. It also makes sure PostgreSQL and Redis are running, then runs the Prisma migrations before restarting the backend.
+
+### `npm run clean-start:worker`
+
+Resets only the worker service.
+
+Use this when the background job processor needs a clean rebuild. It also makes sure PostgreSQL and Redis are running.
+
+### `npm run clean-start:db`
+
+Resets only the PostgreSQL database.
+
+Use this when you want to recreate the database and reapply Prisma migrations without fully resetting the frontend, backend, worker, or Redis.
+
+This command deletes local database data.
+
+### `npm run status`
+
+Shows the current service status.
+
+Use this to check which services are running.
+
+### `npm run logs`
+
+Shows live logs for all services.
+
+Use this when something fails or you want to watch requests, server output, worker jobs, or database startup messages.
+
+### `npm stop`
+
+Stops the project services.
+
+Use this when you are done working and want to shut down the local app.
