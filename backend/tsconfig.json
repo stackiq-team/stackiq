@@ -10,7 +10,7 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node", "jest"]
+    "types": ["node"]
   },
   "include": ["src"]
 }

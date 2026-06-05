@@ -102,6 +102,8 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install
+      - name: Generate Prisma client
+        run: npm run db:generate
       - name: Type check
         run: npx tsc --noEmit
       - name: Run tests with coverage

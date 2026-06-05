@@ -11,5 +11,8 @@
     "clean-start:db": "powershell -ExecutionPolicy Bypass -File scripts/clean-start-db.ps1",
     "logs": "powershell -ExecutionPolicy Bypass -File scripts/logs.ps1",
     "status": "docker compose ps"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.8"
   }
 }
