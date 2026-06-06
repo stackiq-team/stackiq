@@ -2,13 +2,13 @@ import express from "express";
 import cors from "cors";
 import { prisma } from "./db/client";
 import { redis } from "./redis/client";
-import stackRoutes from "./api/route/stack";
+import analysisRoutes from "./api/route/analyses";
 
 export const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use("/stack", stackRoutes);
+app.use("/analyses", analysisRoutes);
 
 app.get("/health", async (req, res) => {
     const health: Record<string, string> = { status: "ok" };

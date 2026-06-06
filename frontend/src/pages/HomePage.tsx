@@ -5,9 +5,9 @@ import { sendJsonForAnalysis } from "../service/ApiService";
 export default function JsonDropZone() {
   const [dragActive, setDragActive] = useState(false);
   const [fileName, setFileName] = useState("");
-  const [jsonContent, setJsonContent] = useState<any>(null);
+  const [jsonText, setJsonText] = useState("");
   const [error, setError] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [resultUrl, setResultUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
   const [email, setEmail] = useState("");
@@ -36,7 +36,7 @@ export default function JsonDropZone() {
 
   const handleFile = useCallback((file: File | undefined) => {
     setError("");
-    setJsonContent(null);
+    setResultUrl("");
 
     if (!file) return;
 
@@ -44,7 +44,7 @@ export default function JsonDropZone() {
       setError("Please upload a .json file.");
       return;
     }
-    setSelectedFile(file);
+
     const reader = new FileReader();
 
     reader.onload = (event: ProgressEvent<FileReader>) => {
@@ -59,7 +59,7 @@ export default function JsonDropZone() {
         const parsed = JSON.parse(result);
 
         setFileName(file.name);
-        setJsonContent(parsed);
+        setJsonText(JSON.stringify(parsed, null, 2));
       } catch {
         setError("Invalid JSON file.");
       }
@@ -92,9 +92,20 @@ export default function JsonDropZone() {
     handleFile(file);
   };
 
+  const handleJsonTextChange = (
+    event: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    setJsonText(event.target.value);
+    setFileName("");
+    setError("");
+    setResultUrl("");
+  };
+
   const handleSubmit = async () => {
-    if (!selectedFile) {
-      setError("Please upload a JSON file.");
+    const trimmedJsonText = jsonText.trim();
+
+    if (!trimmedJsonText) {
+      setError("Please upload a JSON file or paste JSON content.");
       return;
     }
 
@@ -103,18 +114,36 @@ export default function JsonDropZone() {
       return;
     }
 
+    try {
+      JSON.parse(trimmedJsonText);
+    } catch {
+      setError("Please enter valid JSON content.");
+      return;
+    }
+
     setLoading(true);
+
+    const jsonFile = new File(
+      [trimmedJsonText],
+      fileName || "package.json",
+      { type: "application/json" }
+    );
 
     const result = await sendJsonForAnalysis(
       email,
-      selectedFile
+      jsonFile
     );
 
     setLoading(false);
 
-    if (result.success) {
-      alert("File sent successfully!");
-      console.log(result.data);
+    if (result.success && result.data?.analysis.resultToken) {
+      setResultUrl(
+        `/results/${encodeURIComponent(
+          result.data.analysis.resultToken
+        )}`
+      );
+    } else if (result.success) {
+      setError("Upload succeeded, but no result token was returned.");
     } else {
       setError(result.message || "Upload failed.");
     }
@@ -173,11 +202,13 @@ export default function JsonDropZone() {
 
       {error && <div className="error">{error}</div>}
 
-      {jsonContent && (
-        <pre className="preview">
-          {JSON.stringify(jsonContent, null, 2)}
-        </pre>
-      )}
+      <textarea
+        className="jsonTextArea"
+        value={jsonText}
+        onChange={handleJsonTextChange}
+        placeholder="Paste your package.json content here, or upload a JSON file above."
+        spellCheck={false}
+      />
 
       <button
         className="submitButton"
@@ -186,6 +217,17 @@ export default function JsonDropZone() {
       >
         {loading ? "Sending..." : "Send File"}
       </button>
+
+      {resultUrl && (
+        <a
+          className="resultButton"
+          href={resultUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open Result Page
+        </a>
+      )}
     </div>
   );
 }

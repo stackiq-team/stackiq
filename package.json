@@ -3,13 +3,23 @@
   "private": true,
   "scripts": {
     "start": "powershell -ExecutionPolicy Bypass -File scripts/start.ps1",
+    "setup": "powershell -ExecutionPolicy Bypass -File scripts/clean-start.ps1",
     "stop": "powershell -ExecutionPolicy Bypass -File scripts/stop.ps1",
     "clean-start": "powershell -ExecutionPolicy Bypass -File scripts/clean-start.ps1",
     "clean-start:frontend": "powershell -ExecutionPolicy Bypass -File scripts/clean-start-frontend.ps1",
     "clean-start:backend": "powershell -ExecutionPolicy Bypass -File scripts/clean-start-backend.ps1",
     "clean-start:worker": "powershell -ExecutionPolicy Bypass -File scripts/clean-start-worker.ps1",
     "clean-start:db": "powershell -ExecutionPolicy Bypass -File scripts/clean-start-db.ps1",
+    "docker:clean-all": "powershell -ExecutionPolicy Bypass -File scripts/docker-clean-all.ps1",
     "logs": "powershell -ExecutionPolicy Bypass -File scripts/logs.ps1",
-    "status": "docker compose ps"
+    "status": "docker compose ps",
+    "test": "npm run test:e2e && npm --prefix backend test && npm --prefix worker test && npm --prefix frontend test",
+    "test:e2e": "vitest run tests",
+    "test:backend": "npm --prefix backend test",
+    "test:worker": "npm --prefix worker test",
+    "test:frontend": "npm --prefix frontend test"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.8"
   }
 }

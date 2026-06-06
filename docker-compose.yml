@@ -3,6 +3,8 @@ services:
     build: ./frontend
     ports:
       - "5173:5173"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
     depends_on:
       - backend
     volumes:
@@ -22,6 +24,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      BULLMQ_QUEUE_NAME: ${BULLMQ_QUEUE_NAME:-stackiq-analysis}
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -37,6 +40,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      BULLMQ_QUEUE_NAME: ${BULLMQ_QUEUE_NAME:-stackiq-analysis}
     volumes:
       - ./worker:/app
       - /app/node_modules
@@ -51,7 +55,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-stackiq}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "${POSTGRES_PORT:-65432}:65432"
+      - "${POSTGRES_PORT:-65432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

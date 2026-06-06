@@ -1,50 +1,66 @@
 @startuml
-title Diagramme relationnel - StackIQ Sprint 1
+title StackIQ - Domain Model
 
-entity "stacks" as Stack {
-  * id : UUID
-  --
-  name : String
-  created_at : DateTime
-  updated_at : DateTime
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+
+class Analysis {
+  +id: String
+  +email: String
+  +status: AnalysisStatus
+  +resultToken: String
+  +errorMessage: String?
+  +createdAt: DateTime
+  +updatedAt: DateTime
 }
 
-entity "dependencies" as Dependency {
-  * id : UUID
-  --
-  stack_id : UUID <<FK>>
-  name : String
-  version_requirement : String
-  type : DependencyType
-  created_at : DateTime
-  updated_at : DateTime
+class Dependency {
+  +id: String
+  +analysisId: String
+  +name: String
+  +versionRequirement: String
+  +type: DependencyType
+  +createdAt: DateTime
+  +updatedAt: DateTime
 }
 
-entity "analyses" as Analysis {
-  * id : UUID
-  --
-  stack_id : UUID <<FK>>
-  status : AnalysisStatus
-  result_token : UUID
-  error_message : String?
-  created_at : DateTime
-  updated_at : DateTime
+class AnalysisResult {
+  +id: String
+  +analysisId: String
+  +globalScore: Int
+  +riskLevel: String
+  +summary: String
+  +createdAt: DateTime
 }
 
-Stack ||--o{ Dependency : contient
-Stack ||--o{ Analysis : possède
+class DependencyScore {
+  +id: String
+  +analysisResultId: String
+  +dependencyId: String
+  +score: Int
+  +riskLevel: String
+  +createdAt: DateTime
+  +updatedAt: DateTime
+}
 
-note right of Dependency
-Contrainte unique :
-(stack_id, name, type)
-end note
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
 
-note right of Analysis
-status :
-PENDING
-PROCESSING
-COMPLETED
-FAILED
-end note
+enum DependencyType {
+  DEPENDENCY
+  DEV_DEPENDENCY
+}
+
+Analysis "1" --> "many" Dependency : contient
+Analysis "1" --> "0..1" AnalysisResult : produit
+AnalysisResult "1" --> "many" DependencyScore : contient
+Dependency "1" --> "many" DependencyScore : reçoit
+
+Analysis --> AnalysisStatus
+Dependency --> DependencyType
 
 @enduml

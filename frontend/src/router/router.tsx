@@ -1,6 +1,8 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { MainLayout } from '../pages/MainLayout';
 import  HomePage  from '../pages/HomePage';
+import ResultPage from '../pages/ResultPage';
+
 const router = createBrowserRouter([
   {
     path: '/',
@@ -11,6 +13,10 @@ const router = createBrowserRouter([
         element: <HomePage/>
       },
     ]
+  },
+  {
+    path: '/results/:resultToken',
+    element: <ResultPage/>
   }
 ]);
 
