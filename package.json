@@ -12,7 +12,12 @@
     "clean-start:db": "powershell -ExecutionPolicy Bypass -File scripts/clean-start-db.ps1",
     "docker:clean-all": "powershell -ExecutionPolicy Bypass -File scripts/docker-clean-all.ps1",
     "logs": "powershell -ExecutionPolicy Bypass -File scripts/logs.ps1",
-    "status": "docker compose ps"
+    "status": "docker compose ps",
+    "test": "npm run test:e2e && npm --prefix backend test && npm --prefix worker test && npm --prefix frontend test",
+    "test:e2e": "vitest run tests",
+    "test:backend": "npm --prefix backend test",
+    "test:worker": "npm --prefix worker test",
+    "test:frontend": "npm --prefix frontend test"
   },
   "devDependencies": {
     "vitest": "^4.1.8"

@@ -6,10 +6,10 @@ Sprint 1 focuses on the minimal end-to-end flow:
 
 - submit a `package.json`
 - parse `dependencies` and `devDependencies`
-- create a stack analysis
+- create an analysis linked to the submitted email
 - enqueue a BullMQ job
 - process the job in a worker
-- update the analysis status
+- score dependencies and update the analysis status
 
 ## Tech Stack
 
@@ -156,6 +156,35 @@ The script asks for confirmation. To skip the prompt, run:
 npm run docker:clean-all -- -Force
 ```
 
+### `npm test`
+
+Runs the full test suite from the project root.
+
+Test groups:
+
+- root end-to-end analysis flow test
+- backend API and queue tests
+- worker processor tests
+- frontend tests
+
+### `npm run test:e2e`
+
+Runs only the root end-to-end flow test.
+
+The end-to-end test submits a `package.json` to the API, verifies that an analysis job is queued, runs the worker processor, and checks that analysis results and dependency scores are stored.
+
+### `npm run test:backend`
+
+Runs only backend tests.
+
+### `npm run test:worker`
+
+Runs only worker tests.
+
+### `npm run test:frontend`
+
+Runs only frontend tests.
+
 ### `npm run status`
 
 Shows the current service status.
@@ -173,3 +202,32 @@ Use this when something fails or you want to watch requests, server output, work
 Stops the project services.
 
 Use this when you are done working and want to shut down the local app.
+
+## API
+
+### `GET /health`
+
+Checks whether the backend can reach PostgreSQL and Redis.
+
+### `POST /analyses`
+
+Creates a new package analysis.
+
+Request type: `multipart/form-data`
+
+Fields:
+
+- `email`: required email address
+- `file`: required `package.json` file, maximum 1 MB
+
+Behavior:
+
+- parses `dependencies` and `devDependencies`
+- creates an `Analysis` with status `PENDING`
+- creates child `Dependency` records
+- enqueues a BullMQ job with the analysis id
+- returns the created analysis and its private `resultToken`
+
+The worker later marks the analysis `PROCESSING`, scores each dependency, stores `AnalysisResult` and `DependencyScore` records, then marks the analysis `COMPLETED`. On worker failure, the analysis is marked `FAILED` with an error message.
+
+There is currently no public result lookup endpoint documented here.
