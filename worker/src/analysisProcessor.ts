@@ -1,16 +1,30 @@
 import { AnalysisStatus } from "@prisma/client";
 import type { Job } from "bullmq";
 import type { AnalysisJobData } from "./queue/config.js";
+import {
+  scoreDependencies,
+  type DependencyInput,
+} from "./dependencyScore.js";
 
 type AnalysisResultData = {
   globalScore: number;
   riskLevel: string;
   summary: string;
+  dependencyScores?: DependencyScoreData[];
+};
+
+type DependencyScoreData = {
+  dependencyId: string;
+  score: number;
+  riskLevel: string;
 };
 
 type AnalysisRepository = {
   analysis: {
-    findUnique(args: { where: { id: string } }): Promise<{ id: string } | null>;
+    findUnique(args: {
+      where: { id: string };
+      include: { dependencies: true };
+    }): Promise<{ id: string; dependencies: DependencyInput[] } | null>;
     update(args: {
       where: { id: string };
       data: {
@@ -22,15 +36,21 @@ type AnalysisRepository = {
   analysisResult: {
     upsert(args: {
       where: { analysisId: string };
-      create: AnalysisResultData & { analysisId: string };
-      update: AnalysisResultData;
-    }): Promise<unknown>;
+      create: Omit<AnalysisResultData, "dependencyScores"> & { analysisId: string };
+      update: Omit<AnalysisResultData, "dependencyScores">;
+    }): Promise<{ id: string }>;
+  };
+  dependencyScore: {
+    deleteMany(args: { where: { analysisResultId: string } }): Promise<unknown>;
+    createMany(args: { data: Array<DependencyScoreData & { analysisResultId: string }> }): Promise<unknown>;
   };
 };
 
 type ProcessorOptions = {
   prisma: AnalysisRepository;
-  runAnalysis?: (data: AnalysisJobData) => Promise<AnalysisResultData>;
+  runAnalysis?: (
+    data: AnalysisJobData & { dependencies: DependencyInput[] }
+  ) => Promise<AnalysisResultData>;
   logger?: Pick<Console, "log" | "error">;
 };
 
@@ -39,16 +59,19 @@ export async function processAnalysisJob(
   options: ProcessorOptions
 ) {
   const { prisma, runAnalysis = defaultRunAnalysis, logger = console } = options;
-  const { analysisId, stackId } = job.data;
+  const { analysisId } = job.data;
 
   logger.log(
-    `[worker] Job received: jobId=${job.id ?? analysisId}, analysisId=${analysisId}, stackId=${stackId}, attemptsMade=${job.attemptsMade}`
+    `[worker] Job received: jobId=${job.id ?? analysisId}, analysisId=${analysisId}, attemptsMade=${job.attemptsMade}`
   );
 
   logger.log(`[worker] Loading analysis: analysisId=${analysisId}`);
 
   const analysis = await prisma.analysis.findUnique({
     where: { id: analysisId },
+    include: {
+      dependencies: true,
+    },
   });
 
   if (!analysis) {
@@ -70,22 +93,44 @@ export async function processAnalysisJob(
   try {
     logger.log(`[worker] Analysis processing started: analysisId=${analysisId}`);
 
-    const result = await runAnalysis({ analysisId, stackId });
+    const result = await runAnalysis({
+      analysisId,
+      dependencies: analysis.dependencies,
+    });
 
     logger.log(
       `[worker] Saving analysis result: analysisId=${analysisId}, globalScore=${result.globalScore}, riskLevel=${result.riskLevel}`
     );
 
-    await prisma.analysisResult.upsert({
+    const { dependencyScores = [], ...analysisResult } = result;
+
+    const savedResult = await prisma.analysisResult.upsert({
       where: { analysisId },
       create: {
         analysisId,
-        ...result,
+        ...analysisResult,
       },
-      update: result,
+      update: analysisResult,
     });
 
-    logger.log(`[worker] Analysis result saved: analysisId=${analysisId}`);
+    await prisma.dependencyScore.deleteMany({
+      where: {
+        analysisResultId: savedResult.id,
+      },
+    });
+
+    if (dependencyScores.length > 0) {
+      await prisma.dependencyScore.createMany({
+        data: dependencyScores.map((dependencyScore) => ({
+          analysisResultId: savedResult.id,
+          ...dependencyScore,
+        })),
+      });
+    }
+
+    logger.log(
+      `[worker] Analysis result saved: analysisId=${analysisId}, dependencyScores=${dependencyScores.length}`
+    );
 
     logger.log(`[worker] Updating analysis to COMPLETED: analysisId=${analysisId}`);
 
@@ -120,10 +165,8 @@ export async function processAnalysisJob(
   }
 }
 
-async function defaultRunAnalysis(_data: AnalysisJobData): Promise<AnalysisResultData> {
-  return {
-    globalScore: 100,
-    riskLevel: "LOW",
-    summary: "Minimal analysis completed successfully.",
-  };
+async function defaultRunAnalysis(
+  data: AnalysisJobData & { dependencies: DependencyInput[] }
+): Promise<AnalysisResultData> {
+  return scoreDependencies(data.dependencies);
 }

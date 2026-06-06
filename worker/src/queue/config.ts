@@ -1,6 +1,5 @@
 export type AnalysisJobData = {
   analysisId: string;
-  stackId: string;
 };
 
 export const ANALYSIS_QUEUE_NAME =

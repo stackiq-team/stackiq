@@ -2,14 +2,23 @@ import { AnalysisStatus } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { processAnalysisJob } from "../analysisProcessor.js";
 
-function createPrismaMock(analysis: { id: string } | null = { id: "analysis-1" }) {
+function createPrismaMock(
+  analysis: { id: string; dependencies: [] } | null = {
+    id: "analysis-1",
+    dependencies: [],
+  }
+) {
   return {
     analysis: {
       findUnique: vi.fn().mockResolvedValue(analysis),
       update: vi.fn().mockResolvedValue({}),
     },
     analysisResult: {
-      upsert: vi.fn().mockResolvedValue({}),
+      upsert: vi.fn().mockResolvedValue({ id: "result-1" }),
+    },
+    dependencyScore: {
+      deleteMany: vi.fn().mockResolvedValue({}),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
   };
 }
@@ -19,7 +28,6 @@ const job = {
   attemptsMade: 0,
   data: {
     analysisId: "analysis-1",
-    stackId: "stack-1",
   },
 };
 
@@ -45,10 +53,13 @@ describe("processAnalysisJob", () => {
 
     expect(prisma.analysis.findUnique).toHaveBeenCalledWith({
       where: { id: "analysis-1" },
+      include: {
+        dependencies: true,
+      },
     });
     expect(runAnalysis).toHaveBeenCalledWith({
       analysisId: "analysis-1",
-      stackId: "stack-1",
+      dependencies: [],
     });
     expect(prisma.analysis.update).toHaveBeenNthCalledWith(1, {
       where: { id: "analysis-1" },
@@ -78,6 +89,64 @@ describe("processAnalysisJob", () => {
         summary: "Analysis completed.",
       },
     });
+    expect(prisma.dependencyScore.deleteMany).toHaveBeenCalledWith({
+      where: {
+        analysisResultId: "result-1",
+      },
+    });
+    expect(prisma.dependencyScore.createMany).not.toHaveBeenCalled();
+  });
+
+  it("persists dependency scores when the analysis returns them", async () => {
+    const prisma = createPrismaMock();
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 72,
+      riskLevel: "MEDIUM",
+      summary: "Analysis completed.",
+      dependencyScores: [
+        {
+          dependencyId: "dependency-1",
+          score: 72,
+          riskLevel: "MEDIUM",
+        },
+      ],
+    });
+
+    await processAnalysisJob(job, {
+      prisma,
+      runAnalysis,
+      logger,
+    });
+
+    expect(prisma.dependencyScore.deleteMany).toHaveBeenCalledWith({
+      where: {
+        analysisResultId: "result-1",
+      },
+    });
+    expect(prisma.dependencyScore.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          analysisResultId: "result-1",
+          dependencyId: "dependency-1",
+          score: 72,
+          riskLevel: "MEDIUM",
+        },
+      ],
+    });
+    expect(prisma.analysisResult.upsert).toHaveBeenCalledWith({
+      where: { analysisId: "analysis-1" },
+      create: {
+        analysisId: "analysis-1",
+        globalScore: 72,
+        riskLevel: "MEDIUM",
+        summary: "Analysis completed.",
+      },
+      update: {
+        globalScore: 72,
+        riskLevel: "MEDIUM",
+        summary: "Analysis completed.",
+      },
+    });
   });
 
   it("moves an analysis to FAILED and rethrows when the job fails", async () => {
@@ -101,6 +170,7 @@ describe("processAnalysisJob", () => {
       },
     });
     expect(prisma.analysisResult.upsert).not.toHaveBeenCalled();
+    expect(prisma.dependencyScore.deleteMany).not.toHaveBeenCalled();
   });
 
   it("throws when the analysis does not exist so BullMQ can retry the job", async () => {

@@ -9,6 +9,6 @@ export default defineConfig({
   datasource: {
     url:
       process.env["DATABASE_URL"] ||
-      "postgresql://postgres:postgres@localhost:55432/stackiq?schema=public",
+      "postgresql://postgres:postgres@localhost:65432/stackiq?schema=public",
   },
 });
