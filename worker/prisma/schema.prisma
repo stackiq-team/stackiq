@@ -18,47 +18,36 @@ enum DependencyType {
   DEV_DEPENDENCY
 }
 
-model Stack {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  dependencies Dependency[]
-  analyses     Analysis[]
-
-  @@map("stacks")
-}
-
 model Dependency {
   id                 String         @id @default(uuid()) @db.Uuid
-  stackId            String         @map("stack_id") @db.Uuid
+  analysisId         String         @map("analysis_id") @db.Uuid
   name               String
   versionRequirement String         @map("version_requirement")
   type               DependencyType
   createdAt          DateTime       @default(now()) @map("created_at")
   updatedAt          DateTime       @updatedAt @map("updated_at")
 
-  stack Stack @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  analysis Analysis          @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  scores   DependencyScore[]
 
-  @@unique([stackId, name, type])
-  @@index([stackId])
+  @@unique([analysisId, name, type])
+  @@index([analysisId])
   @@map("dependencies")
 }
 
 model Analysis {
   id           String         @id @default(uuid()) @db.Uuid
-  stackId      String         @map("stack_id") @db.Uuid
+  email        String
   status       AnalysisStatus @default(PENDING)
   resultToken  String         @unique @default(uuid()) @map("result_token") @db.Uuid
   errorMessage String?        @map("error_message")
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
-  stack  Stack           @relation(fields: [stackId], references: [id], onDelete: Cascade)
-  result AnalysisResult?
+  dependencies Dependency[]
+  result       AnalysisResult?
 
-  @@index([stackId, status])
+  @@index([status])
   @@map("analyses")
 }
 
@@ -70,7 +59,25 @@ model AnalysisResult {
   summary     String
   createdAt   DateTime @default(now()) @map("created_at")
 
-  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  analysis         Analysis          @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  dependencyScores DependencyScore[]
 
   @@map("analysis_results")
+}
+
+model DependencyScore {
+  id               String   @id @default(uuid()) @db.Uuid
+  analysisResultId String   @map("analysis_result_id") @db.Uuid
+  dependencyId     String   @map("dependency_id") @db.Uuid
+  score            Int
+  riskLevel        String   @map("risk_level")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  analysisResult AnalysisResult @relation(fields: [analysisResultId], references: [id], onDelete: Cascade)
+  dependency     Dependency     @relation(fields: [dependencyId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisResultId, dependencyId])
+  @@index([dependencyId])
+  @@map("dependency_scores")
 }

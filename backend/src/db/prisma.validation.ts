@@ -15,9 +15,10 @@ async function validateMigrations() {
 async function validateCrudAndRelationships() {
   const runId = `validation-${Date.now()}`;
 
-  const stack = await prisma.stack.create({
+  const analysis = await prisma.analysis.create({
     data: {
-      name: runId,
+      email: `${runId}@example.com`,
+      status: AnalysisStatus.PENDING,
       dependencies: {
         create: [
           {
@@ -32,19 +33,12 @@ async function validateCrudAndRelationships() {
           },
         ],
       },
-      analyses: {
-        create: {
-          status: AnalysisStatus.PENDING,
-        },
-      },
     },
     include: {
-      analyses: true,
+      dependencies: true,
     },
   });
 
-  const analysis = stack.analyses[0];
-  assert.ok(analysis);
   assert.equal(analysis.status, AnalysisStatus.PENDING);
   assert.ok(analysis.resultToken);
 
@@ -57,11 +51,10 @@ async function validateCrudAndRelationships() {
 
   assert.equal(updatedAnalysis.status, AnalysisStatus.PROCESSING);
 
-  const loaded = await prisma.stack.findUniqueOrThrow({
-    where: { id: stack.id },
+  const loaded = await prisma.analysis.findUniqueOrThrow({
+    where: { id: analysis.id },
     include: {
       dependencies: true,
-      analyses: true,
     },
   });
 
@@ -74,11 +67,9 @@ async function validateCrudAndRelationships() {
     loaded.dependencies.some((dependency) => dependency.type === DependencyType.DEV_DEPENDENCY),
     true
   );
-  assert.equal(loaded.analyses.length, 1);
-  assert.equal(loaded.analyses[0]?.id, analysis.id);
 
-  await prisma.stack.delete({
-    where: { id: stack.id },
+  await prisma.analysis.delete({
+    where: { id: analysis.id },
   });
 }
 
