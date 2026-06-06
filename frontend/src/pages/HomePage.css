@@ -39,14 +39,32 @@ body {
   color: red;
 }
 
-.preview {
+.jsonTextArea {
+  display: block;
+  width: 100%;
+  min-height: 360px;
   margin-top: 20px;
   background: #111;
   color: rgb(255, 189, 21);
   padding: 20px;
+  border: 1px solid #333;
   border-radius: 10px;
-  overflow-x: auto;
+  box-sizing: border-box;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
   max-height: 800px;
+}
+
+.jsonTextArea:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+.jsonTextArea::placeholder {
+  color: #999;
 }
 
 
@@ -78,4 +96,22 @@ body {
 
 .inputError {
   border-color: red;
+}
+
+.resultButton {
+  display: inline-block;
+  margin-top: 20px;
+  margin-left: 12px;
+  padding: 12px 20px;
+  border: 1px solid #007bff;
+  border-radius: 8px;
+  background: white;
+  color: #007bff;
+  font-size: 16px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.resultButton:hover {
+  background: #eef5ff;
 }

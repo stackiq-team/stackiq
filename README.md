@@ -44,7 +44,7 @@ For local development, these values are enough:
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=stackiq
-POSTGRES_PORT=55432
+POSTGRES_PORT=65432
 DATABASE_URL=postgresql://postgres:postgres@db:5432/stackiq?schema=public
 REDIS_URL=redis://redis:6379
 BULLMQ_QUEUE_NAME=stackiq-analysis
@@ -65,10 +65,10 @@ cd c:\Users\mazig\PFE\stackiq
 If this is your first time running the project, or you want a completely clean setup, run:
 
 ```powershell
-npm run clean-start
+npm run setup
 ```
 
-This recreates the local database/Redis data, rebuilds the services, runs the Prisma migrations, and starts the full app.
+This deletes the StackIQ Docker containers, local Docker volumes, and project-built Docker images, then rebuilds the services, waits for PostgreSQL and Redis, runs the Prisma migrations, and starts the full app.
 
 After it finishes, open:
 
@@ -90,7 +90,7 @@ npm start
 
 ### `npm start`
 
-Starts all services using the existing local data.
+Starts all services using the existing local data. It does not delete the database, Redis data, containers, or images.
 
 Use this for normal development when you do not want to reset the database.
 
@@ -102,11 +102,19 @@ Services started:
 - PostgreSQL
 - Redis
 
+### `npm run setup`
+
+Fully resets and starts the project.
+
+Use this as the one-command setup path. It runs the same script as `npm run clean-start`.
+
+This command deletes local StackIQ Docker data.
+
 ### `npm run clean-start`
 
 Resets and recreates the whole project.
 
-Use this when you want a clean local environment. It deletes the local PostgreSQL and Redis Docker volumes, rebuilds all services, runs the Prisma migrations, and starts everything again.
+Use this when you want a clean local environment. It deletes the local StackIQ containers, local PostgreSQL and Redis Docker volumes, and project-built Docker images, rebuilds all services, waits for PostgreSQL and Redis, runs the Prisma migrations, and starts everything again.
 
 This command deletes local development data.
 
@@ -135,6 +143,18 @@ Resets only the PostgreSQL database.
 Use this when you want to recreate the database and reapply Prisma migrations without fully resetting the frontend, backend, worker, or Redis.
 
 This command deletes local database data.
+
+### `npm run docker:clean-all`
+
+Deletes all Docker containers and all Docker images on this machine.
+
+Use this only when you want to completely clear Docker containers and images. Docker volumes are not deleted.
+
+The script asks for confirmation. To skip the prompt, run:
+
+```powershell
+npm run docker:clean-all -- -Force
+```
 
 ### `npm run status`
 
