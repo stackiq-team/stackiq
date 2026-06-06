@@ -2,10 +2,33 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000"
 
+export interface AnalysisResult {
+  globalScore: number;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+  summary: string;
+  dependencyScores: Array<{
+    score: number;
+    riskLevel: "LOW" | "MEDIUM" | "HIGH";
+    dependency: {
+      name: string;
+      versionRequirement: string;
+      type: "DEPENDENCY" | "DEV_DEPENDENCY";
+    };
+  }>;
+}
+
+export interface AnalysisSubmissionResponse {
+  message: string;
+  analysis: {
+    resultToken: string;
+  };
+  result: AnalysisResult;
+}
+
 export interface AnalyseResponse {
   success: boolean;
   message?: string;
-  data?: unknown;
+  data?: AnalysisSubmissionResponse;
 }
 
 export async function sendJsonForAnalysis(
@@ -19,7 +42,7 @@ export async function sendJsonForAnalysis(
     formData.append("file", file);
 
     const response = await fetch(
-      `${API_BASE_URL}/stack/create`,
+      `${API_BASE_URL}/analyses`,
       {
         method: "POST",
         body: formData,

@@ -2,7 +2,6 @@ import { Queue } from "bullmq";
 
 export type AnalysisJobData = {
   analysisId: string;
-  stackId: string;
 };
 
 export const ANALYSIS_QUEUE_NAME =
@@ -37,7 +36,7 @@ export const analysisQueue = new Queue<
 
 export async function enqueueAnalysisJob(data: AnalysisJobData) {
   console.log(
-    `[queue] Enqueuing analysis job: analysisId=${data.analysisId}, stackId=${data.stackId}, queue=${ANALYSIS_QUEUE_NAME}`
+    `[queue] Enqueuing analysis job: analysisId=${data.analysisId}, queue=${ANALYSIS_QUEUE_NAME}`
   );
 
   const job = await analysisQueue.add("run-analysis", data, {

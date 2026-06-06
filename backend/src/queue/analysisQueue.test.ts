@@ -46,14 +46,12 @@ describe("analysisQueue", () => {
 
     await enqueueAnalysisJob({
       analysisId: "analysis-1",
-      stackId: "stack-1",
     });
 
     expect(queueAddMock).toHaveBeenCalledWith(
       "run-analysis",
       {
         analysisId: "analysis-1",
-        stackId: "stack-1",
       },
       {
         jobId: "analysis-1",
