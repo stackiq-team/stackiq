@@ -12,14 +12,14 @@ const router = createBrowserRouter([
         index: true,
         element: <HomePage/>
       },
+      {
+        path: 'results/:resultToken',
+        element: <ResultPage/>
+      }
     ]
-  },
-  {
-    path: '/results/:resultToken',
-    element: <ResultPage/>
   }
 ]);
-
+  
 export default function App() {
   return <RouterProvider router={router} />;
 }
