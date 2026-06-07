@@ -1,6 +1,8 @@
 services:
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     ports:
       - "5173:5173"
     environment:
@@ -13,7 +15,9 @@ services:
     command: npm run dev -- --host
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile.dev
     ports:
       - "4000:4000"
     depends_on:
@@ -28,10 +32,13 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - /app/src/generated
     command: npm run dev
 
   worker:
-    build: ./worker
+    build: 
+      context: ./worker
+      dockerfile: Dockerfile.dev
     depends_on:
       redis:
         condition: service_healthy
