@@ -25,6 +25,24 @@ export interface AnalysisSubmissionResponse {
   result: AnalysisResult;
 }
 
+export interface AnalysisLookupResponse {
+  message: string;
+  analysis: {
+    id: string;
+    email: string;
+    status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+    resultToken: string;
+    errorMessage: string | null;
+    dependencies: Array<{
+      id: string;
+      name: string;
+      versionRequirement: string;
+      type: "DEPENDENCY" | "DEV_DEPENDENCY";
+    }>;
+    result: AnalysisResult | null;
+  };
+}
+
 export interface AnalyseResponse {
   success: boolean;
   message?: string;
@@ -47,6 +65,35 @@ export async function sendJsonForAnalysis(
         method: "POST",
         body: formData,
       }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return {
+      success: true,
+      data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unknown error occurred",
+    };
+  }
+}
+
+export async function fetchAnalysisByResultToken(
+  resultToken: string
+): Promise<{ success: boolean; message?: string; data?: AnalysisLookupResponse }> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/analyses/${encodeURIComponent(resultToken)}`
     );
 
     if (!response.ok) {

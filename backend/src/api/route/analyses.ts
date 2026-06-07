@@ -19,6 +19,55 @@ const upload = multer({
   },
 });
 
+router.get("/:resultToken", async (req: Request, res: Response) => {
+  const startedAt = Date.now();
+
+  try {
+    const resultTokenRaw = req.params.resultToken;
+    const resultToken = Array.isArray(resultTokenRaw)
+      ? resultTokenRaw[0]
+      : resultTokenRaw;
+
+    if (!resultToken) {
+      return res.status(400).json({ message: "Result token is required" });
+    }
+
+    const analysis = await prisma.analysis.findUnique({
+      where: { resultToken },
+      include: {
+        dependencies: {
+          orderBy: { name: "asc" },
+        },
+        result: {
+          include: {
+            dependencyScores: {
+              include: { dependency: true },
+              orderBy: { dependency: { name: "asc" } },
+            },
+          },
+        },
+      },
+    });
+
+    if (!analysis) {
+      console.warn(`[backend] Analysis lookup: token=${resultToken} not found`);
+      return res.status(404).json({ message: "Analysis not found" });
+    }
+
+    console.log(
+      `[backend] Analysis lookup completed: analysisId=${analysis.id}, durationMs=${Date.now() - startedAt}`
+    );
+
+    return res.status(200).json({ message: "Success", analysis });
+  } catch (error: any) {
+    console.error(
+      `[backend] Analysis lookup failed after ${Date.now() - startedAt}ms:`,
+      error
+    );
+    return res.status(500).json({ message: error.message });
+  }
+});
+
 router.post(
   "/",
   upload.single("file"),
