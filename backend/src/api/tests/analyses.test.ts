@@ -5,6 +5,7 @@ const { prismaMock, enqueueAnalysisJobMock } = vi.hoisted(() => ({
   prismaMock: {
     analysis: {
       create: vi.fn(),
+      findUnique: vi.fn(),
     },
     $queryRaw: vi.fn(),
   },
@@ -137,5 +138,98 @@ describe("POST /analyses", () => {
     );
     expect(prismaMock.analysis.create).not.toHaveBeenCalled();
     expect(enqueueAnalysisJobMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /analyses/:resultToken", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns an analysis by token", async () => {
+    prismaMock.analysis.findUnique.mockResolvedValue({
+      id: "analysis-1",
+      status: "COMPLETED",
+      resultToken: "result-token-1",
+      errorMessage: null,
+      dependencies: [
+        {
+          id: "dependency-1",
+          analysisId: "analysis-1",
+          name: "react",
+          versionRequirement: "^19.0.0",
+          type: "DEPENDENCY",
+        },
+      ],
+      result: {
+        id: "result-1",
+        analysisId: "analysis-1",
+        globalScore: 88,
+        riskLevel: "LOW",
+        summary: "All dependencies look healthy.",
+        dependencyScores: [
+          {
+            id: "score-1",
+            analysisResultId: "result-1",
+            dependencyId: "dependency-1",
+            score: 91,
+            riskLevel: "LOW",
+            dependency: {
+              id: "dependency-1",
+              analysisId: "analysis-1",
+              name: "react",
+              versionRequirement: "^19.0.0",
+              type: "DEPENDENCY",
+            },
+          },
+        ],
+      },
+    });
+
+    const response = await request(app).get("/analyses/result-token-1");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.message).toBe("Success");
+    expect(response.body.analysis).toMatchObject({
+      id: "analysis-1",
+      status: "COMPLETED",
+      resultToken: "result-token-1",
+    });
+
+    expect(prismaMock.analysis.findUnique).toHaveBeenCalledWith({
+      where: {
+        resultToken: "result-token-1",
+      },
+      include: {
+        dependencies: {
+          orderBy: {
+            name: "asc",
+          },
+        },
+        result: {
+          include: {
+            dependencyScores: {
+              include: {
+                dependency: true,
+              },
+              orderBy: {
+                dependency: {
+                  name: "asc",
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it("returns 404 when analysis token does not exist", async () => {
+    prismaMock.analysis.findUnique.mockResolvedValue(null);
+
+    const response = await request(app).get("/analyses/missing-token");
+
+    expect(response.statusCode).toBe(404);
+    expect(response.body.message).toBe("Analysis not found");
   });
 });
