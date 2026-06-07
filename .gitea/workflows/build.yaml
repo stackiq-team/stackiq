@@ -1,0 +1,47 @@
+name: Deploy with gitea
+
+on:
+  push:
+    branches:
+      - main
+      - 19-feat-make-a-fully-deployable-pipeline
+
+jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Gitea registry
+        run: docker login jethroservergit.duckdns.org -u ${{ secrets.REGISTRY_USER }} -p ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push frontend
+        run: |
+          docker build -t jethroservergit.duckdns.org/stackiq-team/frontend:latest ./frontend
+          docker push jethroservergit.duckdns.org/stackiq-team/frontend:latest
+
+  build-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Gitea registry
+        run: docker login jethroservergit.duckdns.org -u ${{ secrets.REGISTRY_USER }} -p ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push backend
+        run: |
+          docker build -t jethroservergit.duckdns.org/stackiq-team/backend:latest ./backend
+          docker push jethroservergit.duckdns.org/stackiq-team/backend:latest
+
+  build-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Gitea registry
+        run: docker login jethroservergit.duckdns.org -u ${{ secrets.REGISTRY_USER }} -p ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push worker
+        run: |
+          docker build -t jethroservergit.duckdns.org/stackiq-team/worker:latest ./worker
+          docker push jethroservergit.duckdns.org/stackiq-team/worker:latest
