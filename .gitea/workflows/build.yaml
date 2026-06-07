@@ -17,8 +17,8 @@ jobs:
 
       - name: Build and push frontend
         run: |
-          docker build -t jethroservergit.duckdns.org/stackiq-team/frontend:latest ./frontend
-          docker push jethroservergit.duckdns.org/stackiq-team/frontend:latest
+          docker build -t jethroservergit.duckdns.org/stackiq-team/frontend:1.0.${{ gitea.run_number }} ./frontend
+          docker push jethroservergit.duckdns.org/stackiq-team/frontend:1.0.${{ gitea.run_number }}
 
   build-backend:
     runs-on: ubuntu-latest
@@ -30,8 +30,8 @@ jobs:
 
       - name: Build and push backend
         run: |
-          docker build -t jethroservergit.duckdns.org/stackiq-team/backend:latest ./backend
-          docker push jethroservergit.duckdns.org/stackiq-team/backend:latest
+          docker build -t jethroservergit.duckdns.org/stackiq-team/backend:1.0.${{ gitea.run_number }} ./backend
+          docker push jethroservergit.duckdns.org/stackiq-team/backend:1.0.${{ gitea.run_number }}
 
   build-worker:
     runs-on: ubuntu-latest
@@ -43,5 +43,5 @@ jobs:
 
       - name: Build and push worker
         run: |
-          docker build -t jethroservergit.duckdns.org/stackiq-team/worker:latest ./worker
-          docker push jethroservergit.duckdns.org/stackiq-team/worker:latest
+          docker build -t jethroservergit.duckdns.org/stackiq-team/worker:1.0.${{ gitea.run_number }} ./worker
+          docker push jethroservergit.duckdns.org/stackiq-team/worker:1.0.${{ gitea.run_number }}
