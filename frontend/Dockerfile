@@ -8,7 +8,7 @@ RUN npm install
 
 COPY . .
 
-ARG VITE_API_URL=http://backend:4000
+ARG VITE_API_URL=https://jethroserver.duckdns.org/api
 ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
