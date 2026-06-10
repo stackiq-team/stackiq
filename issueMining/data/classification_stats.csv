@@ -1,0 +1,5 @@
+label,count,percentage
+non_issue,4,50.0%
+fixed_by_devs,3,37.5%
+not_our_problem,1,12.5%
+Total,8,100%

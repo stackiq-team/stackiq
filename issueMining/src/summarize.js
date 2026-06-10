@@ -3,7 +3,7 @@ const fs = require('fs');
 
 // Input/output configuration
 const inputPath = process.argv[2];
-const outputPath = process.argv[3] || './data/issues_res.json';
+const outputPath = process.argv[3] || '../data/issues_res.json';
 const jsonData = JSON.parse(fs.readFileSync(inputPath, 'utf-8'));
 
 // Sets to track how issues were closed

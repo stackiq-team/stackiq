@@ -3,9 +3,10 @@ const { projectQuery, issueItemQuery } = require('./queries');
 const { graphql } = require("@octokit/graphql");
 const fs = require('fs');
 require('dotenv').config();
+console.log('Token loaded:', !!process.env.GITHUB_API_TOKEN);
 
 // GitHub access token(s) for authentication
-const tokens = [process.env.GITHUB_TOKEN];
+const tokens = [`${process.env.GITHUB_API_TOKEN}`];
 const tokenReset = tokens.map(() => "0"); // Store reset timestamps per token
 const tokenRemaining = tokens.map(() => -1); // Store remaining request quota per token
 let tokenNum = 0; // Index of the current token in use
@@ -136,7 +137,7 @@ async function executeQueries(srcFile) {
 if (process.argv.length < 5) {
   input = process.argv[2];
   start_date = process.argv[3] || "";
-  output = `./data/issues~${input.replace("/", "~")}~.json`;
+  output = `../data/issues~${input.replace("/", "~")}~.json`;
   try { fs.unlinkSync(output); } catch (e) {}
   executeQuery0([input], currentProjectIndex, currentCursor, start_date);
 } else {

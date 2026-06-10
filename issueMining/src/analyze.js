@@ -1,8 +1,8 @@
 const fs = require('fs');
 
 // Input and output file paths
-const inputFilePath = './classifications.csv';
-const outputFilePath = './data/classification_stats.csv';
+const inputFilePath = '../data/classifications.csv';
+const outputFilePath = '../data/classification_stats.csv';
 
 // Read and parse the input CSV file, skipping the header
 const data = fs.readFileSync(inputFilePath, 'utf-8').trim().split('\n').slice(1);

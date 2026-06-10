@@ -1,0 +1,2012 @@
+[
+{
+    "nameWithOwner": "stackiq-team/stackiq",
+    "issues": {
+        "totalCount": 8,
+        "pageInfo": {
+            "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0wNlQwMjoyNTowMlrPAAAAAQWQT74=",
+            "hasNextPage": true
+        },
+        "edges": [
+            {
+                "cursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0wNlQwMjoyNTowMlrPAAAAAQWQT74=",
+                "node": {
+                    "title": "Test of issue workflow",
+                    "url": "https://github.com/stackiq-team/stackiq/issues/1",
+                    "bodyText": "",
+                    "bodyHTML": "",
+                    "author": {
+                        "login": "JethroRoy",
+                        "url": "https://github.com/JethroRoy",
+                        "__typename": "User"
+                    },
+                    "authorAssociation": "MEMBER",
+                    "publishedAt": "2026-05-06T02:25:02Z",
+                    "closedAt": "2026-05-06T02:26:14Z",
+                    "lastEditedAt": null,
+                    "reactionGroups": [
+                        {
+                            "content": "THUMBS_UP",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "THUMBS_DOWN",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "LAUGH",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HOORAY",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "CONFUSED",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HEART",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "ROCKET",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "EYES",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        }
+                    ],
+                    "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                    },
+                    "assignees": {
+                        "totalCount": 0
+                    },
+                    "items": {
+                        "totalCount": 7,
+                        "pageInfo": {
+                            "endCursor": "Y3Vyc29yOnYyOpPPAAABnfsby2ABqzI1MjAwOTUxMzY3",
+                            "hasNextPage": false
+                        },
+                        "edges": [
+                            {
+                                "node": {
+                                    "__typename": "AddedToProjectV2Event"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "IssueComment",
+                                    "id": "IC_kwDOSVbUEM8AAAABBVhiWw",
+                                    "url": "https://github.com/stackiq-team/stackiq/issues/1#issuecomment-4384645723",
+                                    "createdAt": "2026-05-06T02:26:14Z",
+                                    "updatedAt": "2026-05-06T02:26:14Z",
+                                    "bodyText": "Test of closing issue",
+                                    "bodyHTML": "<p dir=\"auto\">Test of closing issue</p>",
+                                    "isMinimized": false,
+                                    "lastEditedAt": null,
+                                    "minimizedReason": null,
+                                    "databaseId": 4384645723,
+                                    "editor": null,
+                                    "author": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "authorAssociation": "MEMBER",
+                                    "publishedAt": "2026-05-06T02:26:14Z",
+                                    "reactionGroups": [
+                                        {
+                                            "content": "THUMBS_UP",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "THUMBS_DOWN",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "LAUGH",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "HOORAY",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "CONFUSED",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "HEART",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "ROCKET",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "EYES",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ClosedEvent",
+                                    "id": "CE_lADOSVbUEM8AAAABBZBPvs8AAAAF3hfcnQ",
+                                    "createdAt": "2026-05-06T02:26:14Z",
+                                    "stateReason": "COMPLETED",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "closer": null
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "RemovedFromProjectV2Event"
+                                }
+                            }
+                        ]
+                    },
+                    "closed": true,
+                    "locked": false,
+                    "includesCreatedEdit": false,
+                    "number": 1,
+                    "id": "I_kwDOSVbUEM8AAAABBZBPvg",
+                    "databaseId": 4388310974,
+                    "milestone": null
+                }
+            }
+        ]
+    }
+},
+{
+    "nameWithOwner": "stackiq-team/stackiq",
+    "issues": {
+        "totalCount": 8,
+        "pageInfo": {
+            "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0xM1QwMTowNDowMVrPAAAAAQhF1jY=",
+            "hasNextPage": true
+        },
+        "edges": [
+            {
+                "cursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0xM1QwMTowNDowMVrPAAAAAQhF1jY=",
+                "node": {
+                    "title": "Feat: Setup initial du repo",
+                    "url": "https://github.com/stackiq-team/stackiq/issues/2",
+                    "bodyText": "Résumé\nSetup initial du repo avec node\nProblème / motivation\nDébut du projet\nSolution proposée\nDébut du projet\nSolutions alternatives envisagées (optionnel)\nNo response\nRisques et impact (optionnel)\nNo response\nCritères d'acceptation\n\n Implémentation de la fonctionnalité ajoutée\n Tests unitaires et E2E ajoutés\n Docs mises à jour (README / CHANGELOG)\n\nPriorité\nP2 - moyenne\nInformation supplémentaire / captures d'écran (optionnel)\nNo response",
+                    "bodyHTML": "<h3 dir=\"auto\">Résumé</h3>\n<p dir=\"auto\">Setup initial du repo avec node</p>\n<h3 dir=\"auto\">Problème / motivation</h3>\n<p dir=\"auto\">Début du projet</p>\n<h3 dir=\"auto\">Solution proposée</h3>\n<p dir=\"auto\">Début du projet</p>\n<h3 dir=\"auto\">Solutions alternatives envisagées (optionnel)</h3>\n<p dir=\"auto\"><em>No response</em></p>\n<h3 dir=\"auto\">Risques et impact (optionnel)</h3>\n<p dir=\"auto\"><em>No response</em></p>\n<h3 dir=\"auto\">Critères d'acceptation</h3>\n<ul class=\"contains-task-list\">\n<li class=\"task-list-item\"><input type=\"checkbox\" id=\"\" disabled=\"\" class=\"task-list-item-checkbox\" aria-label=\"Completed task\" checked=\"\"> Implémentation de la fonctionnalité ajoutée</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" id=\"\" disabled=\"\" class=\"task-list-item-checkbox\" aria-label=\"Incomplete task\"> Tests unitaires et E2E ajoutés</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" id=\"\" disabled=\"\" class=\"task-list-item-checkbox\" aria-label=\"Incomplete task\"> Docs mises à jour (README / CHANGELOG)</li>\n</ul>\n<h3 dir=\"auto\">Priorité</h3>\n<p dir=\"auto\">P2 - moyenne</p>\n<h3 dir=\"auto\">Information supplémentaire / captures d'écran (optionnel)</h3>\n<p dir=\"auto\"><em>No response</em></p>",
+                    "author": {
+                        "login": "JethroRoy",
+                        "url": "https://github.com/JethroRoy",
+                        "__typename": "User"
+                    },
+                    "authorAssociation": "MEMBER",
+                    "publishedAt": "2026-05-13T01:04:01Z",
+                    "closedAt": "2026-05-13T15:41:49Z",
+                    "lastEditedAt": null,
+                    "reactionGroups": [
+                        {
+                            "content": "THUMBS_UP",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "THUMBS_DOWN",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "LAUGH",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HOORAY",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "CONFUSED",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HEART",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "ROCKET",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "EYES",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        }
+                    ],
+                    "labels": {
+                        "totalCount": 1,
+                        "nodes": [
+                            {
+                                "createdAt": "2026-05-06T01:44:08Z",
+                                "name": "feature",
+                                "isDefault": false
+                            }
+                        ]
+                    },
+                    "assignees": {
+                        "totalCount": 1
+                    },
+                    "items": {
+                        "totalCount": 11,
+                        "pageInfo": {
+                            "endCursor": "Y3Vyc29yOnYyOpPPAAABniIAYhgBqzI1NDg5NTAzMzkw",
+                            "hasNextPage": false
+                        },
+                        "edges": [
+                            {
+                                "node": {
+                                    "__typename": "AssignedEvent",
+                                    "id": "AE_lADOSVbUEM8AAAABCEXWNs8AAAAF7WVR3Q",
+                                    "createdAt": "2026-05-13T01:04:02Z",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "assignee": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy"
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "LabeledEvent",
+                                    "id": "LE_lADOSVbUEM8AAAABCEXWNs8AAAAF7WVTEw",
+                                    "createdAt": "2026-05-13T01:04:02Z",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "label": {
+                                        "name": "feature",
+                                        "createdAt": "2026-05-06T01:44:08Z",
+                                        "url": "https://github.com/stackiq-team/stackiq/labels/feature",
+                                        "isDefault": false
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AddedToProjectV2Event"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "IssueTypeAddedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "MilestonedEvent",
+                                    "id": "MIE_lADOSVbUEM8AAAABCEXWNs8AAAAF7WZOlg",
+                                    "createdAt": "2026-05-13T01:06:15Z",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "milestoneTitle": "Split 1"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ConnectedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ClosedEvent",
+                                    "id": "CE_lADOSVbUEM8AAAABCEXWNs8AAAAF70rtqw",
+                                    "createdAt": "2026-05-13T15:41:49Z",
+                                    "stateReason": "COMPLETED",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "closer": {
+                                        "__typename": "PullRequest",
+                                        "id": "PR_kwDOSVbUEM7bLoRQ",
+                                        "url": "https://github.com/stackiq-team/stackiq/pull/3",
+                                        "merged": true,
+                                        "baseRepository": {
+                                            "name": "stackiq",
+                                            "nameWithOwner": "stackiq-team/stackiq"
+                                        },
+                                        "state": "MERGED",
+                                        "isCrossRepository": false,
+                                        "author": {
+                                            "login": "JethroRoy",
+                                            "url": "https://github.com/JethroRoy",
+                                            "__typename": "User"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            }
+                        ]
+                    },
+                    "closed": true,
+                    "locked": false,
+                    "includesCreatedEdit": false,
+                    "number": 2,
+                    "id": "I_kwDOSVbUEM8AAAABCEXWNg",
+                    "databaseId": 4433761846,
+                    "milestone": {
+                        "number": 1,
+                        "closed": false,
+                        "closedAt": null,
+                        "createdAt": "2026-05-13T01:05:58Z",
+                        "creator": {
+                            "login": "JethroRoy",
+                            "url": "https://github.com/JethroRoy",
+                            "__typename": "User"
+                        },
+                        "description": "",
+                        "dueOn": "2026-06-08T00:00:00Z",
+                        "title": "Sprint 1",
+                        "updatedAt": "2026-06-09T00:51:03Z"
+                    }
+                }
+            }
+        ]
+    }
+},
+{
+    "nameWithOwner": "stackiq-team/stackiq",
+    "issues": {
+        "totalCount": 8,
+        "pageInfo": {
+            "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0yM1QwMDo1MTo0N1rPAAAAAQyYzx8=",
+            "hasNextPage": true
+        },
+        "edges": [
+            {
+                "cursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0yM1QwMDo1MTo0N1rPAAAAAQyYzx8=",
+                "node": {
+                    "title": "Configuration Prisma et modèle de données initial",
+                    "url": "https://github.com/stackiq-team/stackiq/issues/4",
+                    "bodyText": "Configuration Prisma et modèle de données initial\nTâches\n\nConfigurer Prisma\nConfigurer les migrations\nCréer les modèles :\n\nStack\nDependency\nAnalysis\nAnalysisResult\nNotification\nDependencyAnalysisCache\n\n\n\nTests\n\nTests CRUD Prisma\nValidation des relations de la base de données\nValidation des migrations\n\nLivrables\n\nSchéma de base de données initial stable",
+                    "bodyHTML": "<h2 dir=\"auto\">Configuration Prisma et modèle de données initial</h2>\n<h3 dir=\"auto\">Tâches</h3>\n<ul dir=\"auto\">\n<li>Configurer Prisma</li>\n<li>Configurer les migrations</li>\n<li>Créer les modèles :\n<ul dir=\"auto\">\n<li>Stack</li>\n<li>Dependency</li>\n<li>Analysis</li>\n<li>AnalysisResult</li>\n<li>Notification</li>\n<li>DependencyAnalysisCache</li>\n</ul>\n</li>\n</ul>\n<h3 dir=\"auto\">Tests</h3>\n<ul dir=\"auto\">\n<li>Tests CRUD Prisma</li>\n<li>Validation des relations de la base de données</li>\n<li>Validation des migrations</li>\n</ul>\n<h3 dir=\"auto\">Livrables</h3>\n<ul dir=\"auto\">\n<li>Schéma de base de données initial stable</li>\n</ul>",
+                    "author": {
+                        "login": "amine-12",
+                        "url": "https://github.com/amine-12",
+                        "__typename": "User"
+                    },
+                    "authorAssociation": "MEMBER",
+                    "publishedAt": "2026-05-23T00:51:47Z",
+                    "closedAt": "2026-06-04T01:22:13Z",
+                    "lastEditedAt": null,
+                    "reactionGroups": [
+                        {
+                            "content": "THUMBS_UP",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "THUMBS_DOWN",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "LAUGH",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HOORAY",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "CONFUSED",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HEART",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "ROCKET",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "EYES",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        }
+                    ],
+                    "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                    },
+                    "assignees": {
+                        "totalCount": 1
+                    },
+                    "items": {
+                        "totalCount": 10,
+                        "pageInfo": {
+                            "endCursor": "Y3Vyc29yOnYyOpPPAAABnpA5RYgBqzI2MzE1NDUwNjA4",
+                            "hasNextPage": false
+                        },
+                        "edges": [
+                            {
+                                "node": {
+                                    "__typename": "MilestonedEvent",
+                                    "id": "MIE_lADOSVbUEM8AAAABDJjPH88AAAAGBisBdQ",
+                                    "createdAt": "2026-05-23T00:51:48Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "milestoneTitle": "Sprint 1"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AddedToProjectV2Event"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AssignedEvent",
+                                    "id": "AE_lADOSVbUEM8AAAABDJjPH88AAAAGBitCxw",
+                                    "createdAt": "2026-05-23T00:53:04Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "assignee": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12"
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "RenamedTitleEvent",
+                                    "id": "RTE_lADOSVbUEM8AAAABDJjPH88AAAAGBivXSQ",
+                                    "createdAt": "2026-05-23T00:56:07Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "currentTitle": "ST02 - Configuration Prisma et modèle de données initial",
+                                    "previousTitle": "Configuration Prisma et modèle de données initial"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "RenamedTitleEvent",
+                                    "id": "RTE_lADOSVbUEM8AAAABDJjPH88AAAAGBiwFJQ",
+                                    "createdAt": "2026-05-23T00:57:03Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "currentTitle": "Configuration Prisma et modèle de données initial",
+                                    "previousTitle": "ST02 - Configuration Prisma et modèle de données initial"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ClosedEvent",
+                                    "id": "CE_lADOSVbUEM8AAAABDJjPH88AAAAGIIXo8A",
+                                    "createdAt": "2026-06-04T01:22:13Z",
+                                    "stateReason": "COMPLETED",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "closer": null
+                                }
+                            }
+                        ]
+                    },
+                    "closed": true,
+                    "locked": false,
+                    "includesCreatedEdit": false,
+                    "number": 4,
+                    "id": "I_kwDOSVbUEM8AAAABDJjPHw",
+                    "databaseId": 4506308383,
+                    "milestone": {
+                        "number": 1,
+                        "closed": false,
+                        "closedAt": null,
+                        "createdAt": "2026-05-13T01:05:58Z",
+                        "creator": {
+                            "login": "JethroRoy",
+                            "url": "https://github.com/JethroRoy",
+                            "__typename": "User"
+                        },
+                        "description": "",
+                        "dueOn": "2026-06-08T00:00:00Z",
+                        "title": "Sprint 1",
+                        "updatedAt": "2026-06-09T00:51:03Z"
+                    }
+                }
+            }
+        ]
+    }
+},
+{
+    "nameWithOwner": "stackiq-team/stackiq",
+    "issues": {
+        "totalCount": 8,
+        "pageInfo": {
+            "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0yM1QwMDo1Mjo1N1rPAAAAAQyY2go=",
+            "hasNextPage": true
+        },
+        "edges": [
+            {
+                "cursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0yM1QwMDo1Mjo1N1rPAAAAAQyY2go=",
+                "node": {
+                    "title": "Queue et workers",
+                    "url": "https://github.com/stackiq-team/stackiq/issues/5",
+                    "bodyText": "ST04 — Queue et workers\nTâches\n\nConfigurer BullMQ\nConfigurer Redis queue\nCréer un worker minimal\nImplémenter le workflow des analyses :\n\nPENDING\nPROCESSING\nCOMPLETED\nFAILED\n\n\nAjouter les logs du worker\n\nTests\n\nCréation des jobs\nConsommation des jobs\nRetry des jobs\nGestion des erreurs des workers\nValidation du changement de statut des analyses\n\nLivrables\n\nPipeline asynchrone fonctionnel",
+                    "bodyHTML": "<h2 dir=\"auto\">ST04 — Queue et workers</h2>\n<h3 dir=\"auto\">Tâches</h3>\n<ul dir=\"auto\">\n<li>Configurer BullMQ</li>\n<li>Configurer Redis queue</li>\n<li>Créer un worker minimal</li>\n<li>Implémenter le workflow des analyses :\n<ul dir=\"auto\">\n<li>PENDING</li>\n<li>PROCESSING</li>\n<li>COMPLETED</li>\n<li>FAILED</li>\n</ul>\n</li>\n<li>Ajouter les logs du worker</li>\n</ul>\n<h3 dir=\"auto\">Tests</h3>\n<ul dir=\"auto\">\n<li>Création des jobs</li>\n<li>Consommation des jobs</li>\n<li>Retry des jobs</li>\n<li>Gestion des erreurs des workers</li>\n<li>Validation du changement de statut des analyses</li>\n</ul>\n<h3 dir=\"auto\">Livrables</h3>\n<ul dir=\"auto\">\n<li>Pipeline asynchrone fonctionnel</li>\n</ul>",
+                    "author": {
+                        "login": "amine-12",
+                        "url": "https://github.com/amine-12",
+                        "__typename": "User"
+                    },
+                    "authorAssociation": "MEMBER",
+                    "publishedAt": "2026-05-23T00:52:57Z",
+                    "closedAt": "2026-06-06T17:10:50Z",
+                    "lastEditedAt": null,
+                    "reactionGroups": [
+                        {
+                            "content": "THUMBS_UP",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "THUMBS_DOWN",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "LAUGH",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HOORAY",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "CONFUSED",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HEART",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "ROCKET",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "EYES",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        }
+                    ],
+                    "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                    },
+                    "assignees": {
+                        "totalCount": 1
+                    },
+                    "items": {
+                        "totalCount": 13,
+                        "pageInfo": {
+                            "endCursor": "Y3Vyc29yOnYyOpPPAAABnp3qgWABqzI2NDI1NTEyMjk4",
+                            "hasNextPage": false
+                        },
+                        "edges": [
+                            {
+                                "node": {
+                                    "__typename": "MilestonedEvent",
+                                    "id": "MIE_lADOSVbUEM8AAAABDJjaCs8AAAAGBis9rQ",
+                                    "createdAt": "2026-05-23T00:52:57Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "milestoneTitle": "Sprint 1"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AddedToProjectV2Event"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AssignedEvent",
+                                    "id": "AE_lADOSVbUEM8AAAABDJjaCs8AAAAGBitGSQ",
+                                    "createdAt": "2026-05-23T00:53:08Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "assignee": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12"
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "RenamedTitleEvent",
+                                    "id": "RTE_lADOSVbUEM8AAAABDJjaCs8AAAAGBivm8w",
+                                    "createdAt": "2026-05-23T00:56:26Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "currentTitle": "ST04 - Queue et workers",
+                                    "previousTitle": "Queue et workers"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "RenamedTitleEvent",
+                                    "id": "RTE_lADOSVbUEM8AAAABDJjaCs8AAAAGBiwLbQ",
+                                    "createdAt": "2026-05-23T00:57:10Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "currentTitle": "Queue et workers",
+                                    "previousTitle": "ST04 - Queue et workers"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "IssueComment",
+                                    "id": "IC_kwDOSVbUEM8AAAABEWhLDA",
+                                    "url": "https://github.com/stackiq-team/stackiq/issues/5#issuecomment-4587014924",
+                                    "createdAt": "2026-05-31T14:32:38Z",
+                                    "updatedAt": "2026-05-31T14:32:38Z",
+                                    "bodyText": "@amine-12 J'ai initialisé les workers dans ma branche lié à l'issue #6",
+                                    "bodyHTML": "<p dir=\"auto\"><a class=\"user-mention notranslate\" data-hovercard-type=\"user\" data-hovercard-url=\"/users/amine-12/hovercard\" data-octo-click=\"hovercard-link-click\" data-octo-dimensions=\"link_type:self\" href=\"https://github.com/amine-12\">@amine-12</a> J'ai initialisé les workers dans ma branche lié à l'issue <a class=\"issue-link js-issue-link\" data-error-text=\"Failed to load title\" data-id=\"4506314125\" data-permission-text=\"Title is private\" data-url=\"https://github.com/stackiq-team/stackiq/issues/6\" data-hovercard-type=\"issue\" data-hovercard-url=\"/stackiq-team/stackiq/issues/6/hovercard\" href=\"https://github.com/stackiq-team/stackiq/issues/6\">#6</a></p>",
+                                    "isMinimized": false,
+                                    "lastEditedAt": null,
+                                    "minimizedReason": null,
+                                    "databaseId": 4587014924,
+                                    "editor": null,
+                                    "author": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "authorAssociation": "MEMBER",
+                                    "publishedAt": "2026-05-31T14:32:38Z",
+                                    "reactionGroups": [
+                                        {
+                                            "content": "THUMBS_UP",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "THUMBS_DOWN",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "LAUGH",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "HOORAY",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "CONFUSED",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "HEART",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "ROCKET",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "EYES",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "MentionedEvent",
+                                    "id": "MEE_lADOSVbUEM8AAAABDJjaCs8AAAAGFyxywA",
+                                    "createdAt": "2026-05-31T14:32:40Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "SubscribedEvent",
+                                    "id": "SE_lADOSVbUEM8AAAABDJjaCs8AAAAGFyxyyg",
+                                    "createdAt": "2026-05-31T14:32:40Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ClosedEvent",
+                                    "id": "CE_lADOSVbUEM8AAAABDJjaCs8AAAAGJxVIBw",
+                                    "createdAt": "2026-06-06T17:10:50Z",
+                                    "stateReason": "COMPLETED",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "closer": null
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            }
+                        ]
+                    },
+                    "closed": true,
+                    "locked": false,
+                    "includesCreatedEdit": false,
+                    "number": 5,
+                    "id": "I_kwDOSVbUEM8AAAABDJjaCg",
+                    "databaseId": 4506311178,
+                    "milestone": {
+                        "number": 1,
+                        "closed": false,
+                        "closedAt": null,
+                        "createdAt": "2026-05-13T01:05:58Z",
+                        "creator": {
+                            "login": "JethroRoy",
+                            "url": "https://github.com/JethroRoy",
+                            "__typename": "User"
+                        },
+                        "description": "",
+                        "dueOn": "2026-06-08T00:00:00Z",
+                        "title": "Sprint 1",
+                        "updatedAt": "2026-06-09T00:51:03Z"
+                    }
+                }
+            }
+        ]
+    }
+},
+{
+    "nameWithOwner": "stackiq-team/stackiq",
+    "issues": {
+        "totalCount": 8,
+        "pageInfo": {
+            "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0yM1QwMDo1NDowMlrPAAAAAQyY5Y0=",
+            "hasNextPage": true
+        },
+        "edges": [
+            {
+                "cursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0yM1QwMDo1NDowMlrPAAAAAQyY5Y0=",
+                "node": {
+                    "title": "Configuration de l’environnement et Docker Compose",
+                    "url": "https://github.com/stackiq-team/stackiq/issues/6",
+                    "bodyText": "ST01 — Configuration de l’environnement et Docker Compose\nTâches\n\nConfigurer :\n\nfrontend\nbackend\nworker\npostgres\nredis\n\n\nVérifier la communication entre services\nConfigurer .env\nConfigurer le networking Docker\nVérifier la connectivité Prisma/PostgreSQL\n\nTests\n\nVérifier que tous les containers démarrent correctement\nVérifier la communication backend ↔ postgres\nVérifier la communication backend ↔ redis\nVérifier la communication worker ↔ redis\n\nLivrables\n\nInfrastructure Docker fonctionnelle\nEnvironnement partagé stable",
+                    "bodyHTML": "<h2 dir=\"auto\">ST01 — Configuration de l’environnement et Docker Compose</h2>\n<h3 dir=\"auto\">Tâches</h3>\n<ul dir=\"auto\">\n<li>Configurer :\n<ul dir=\"auto\">\n<li>frontend</li>\n<li>backend</li>\n<li>worker</li>\n<li>postgres</li>\n<li>redis</li>\n</ul>\n</li>\n<li>Vérifier la communication entre services</li>\n<li>Configurer <code class=\"notranslate\">.env</code></li>\n<li>Configurer le networking Docker</li>\n<li>Vérifier la connectivité Prisma/PostgreSQL</li>\n</ul>\n<h3 dir=\"auto\">Tests</h3>\n<ul dir=\"auto\">\n<li>Vérifier que tous les containers démarrent correctement</li>\n<li>Vérifier la communication backend ↔ postgres</li>\n<li>Vérifier la communication backend ↔ redis</li>\n<li>Vérifier la communication worker ↔ redis</li>\n</ul>\n<h3 dir=\"auto\">Livrables</h3>\n<ul dir=\"auto\">\n<li>Infrastructure Docker fonctionnelle</li>\n<li>Environnement partagé stable</li>\n</ul>",
+                    "author": {
+                        "login": "amine-12",
+                        "url": "https://github.com/amine-12",
+                        "__typename": "User"
+                    },
+                    "authorAssociation": "MEMBER",
+                    "publishedAt": "2026-05-23T00:54:02Z",
+                    "closedAt": "2026-05-31T16:11:18Z",
+                    "lastEditedAt": null,
+                    "reactionGroups": [
+                        {
+                            "content": "THUMBS_UP",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "THUMBS_DOWN",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "LAUGH",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HOORAY",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "CONFUSED",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HEART",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "ROCKET",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "EYES",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        }
+                    ],
+                    "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                    },
+                    "assignees": {
+                        "totalCount": 1
+                    },
+                    "items": {
+                        "totalCount": 11,
+                        "pageInfo": {
+                            "endCursor": "Y3Vyc29yOnYyOpPPAAABnn7N1FgBqzI2MTYwMDA3NzA4",
+                            "hasNextPage": false
+                        },
+                        "edges": [
+                            {
+                                "node": {
+                                    "__typename": "MilestonedEvent",
+                                    "id": "MIE_lADOSVbUEM8AAAABDJjljc8AAAAGBit2gg",
+                                    "createdAt": "2026-05-23T00:54:03Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "milestoneTitle": "Sprint 1"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AddedToProjectV2Event"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AssignedEvent",
+                                    "id": "AE_lADOSVbUEM8AAAABDJjljc8AAAAGFQPmLg",
+                                    "createdAt": "2026-05-29T18:04:24Z",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "assignee": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy"
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "CrossReferencedEvent",
+                                    "id": "CRE_kwDOSVbUEM8AAAABo2G6mA",
+                                    "createdAt": "2026-05-31T14:32:39Z",
+                                    "isCrossRepository": false,
+                                    "referencedAt": "2026-05-31T14:32:38Z",
+                                    "willCloseTarget": false,
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "source": {
+                                        "__typename": "Issue",
+                                        "id": "I_kwDOSVbUEM8AAAABDJjaCg",
+                                        "url": "https://github.com/stackiq-team/stackiq/issues/5",
+                                        "databaseId": 4506311178,
+                                        "createdAt": "2026-05-23T00:52:57Z",
+                                        "closedAt": "2026-06-06T17:10:50Z",
+                                        "number": 5,
+                                        "title": "Queue et workers",
+                                        "repository": {
+                                            "nameWithOwner": "stackiq-team/stackiq"
+                                        },
+                                        "author": {
+                                            "login": "amine-12",
+                                            "url": "https://github.com/amine-12",
+                                            "__typename": "User"
+                                        }
+                                    },
+                                    "target": {
+                                        "__typename": "Issue",
+                                        "id": "I_kwDOSVbUEM8AAAABDJjljQ",
+                                        "url": "https://github.com/stackiq-team/stackiq/issues/6",
+                                        "databaseId": 4506314125,
+                                        "createdAt": "2026-05-23T00:54:02Z",
+                                        "closedAt": "2026-05-31T16:11:18Z",
+                                        "number": 6,
+                                        "title": "Configuration de l’environnement et Docker Compose",
+                                        "repository": {
+                                            "nameWithOwner": "stackiq-team/stackiq"
+                                        },
+                                        "author": {
+                                            "login": "amine-12",
+                                            "url": "https://github.com/amine-12",
+                                            "__typename": "User"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ConnectedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ClosedEvent",
+                                    "id": "CE_lADOSVbUEM8AAAABDJjljc8AAAAGF0IFZg",
+                                    "createdAt": "2026-05-31T16:11:18Z",
+                                    "stateReason": "COMPLETED",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "closer": {
+                                        "__typename": "PullRequest",
+                                        "id": "PR_kwDOSVbUEM7hGma-",
+                                        "url": "https://github.com/stackiq-team/stackiq/pull/11",
+                                        "merged": true,
+                                        "baseRepository": {
+                                            "name": "stackiq",
+                                            "nameWithOwner": "stackiq-team/stackiq"
+                                        },
+                                        "state": "MERGED",
+                                        "isCrossRepository": false,
+                                        "author": {
+                                            "login": "JethroRoy",
+                                            "url": "https://github.com/JethroRoy",
+                                            "__typename": "User"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            }
+                        ]
+                    },
+                    "closed": true,
+                    "locked": false,
+                    "includesCreatedEdit": false,
+                    "number": 6,
+                    "id": "I_kwDOSVbUEM8AAAABDJjljQ",
+                    "databaseId": 4506314125,
+                    "milestone": {
+                        "number": 1,
+                        "closed": false,
+                        "closedAt": null,
+                        "createdAt": "2026-05-13T01:05:58Z",
+                        "creator": {
+                            "login": "JethroRoy",
+                            "url": "https://github.com/JethroRoy",
+                            "__typename": "User"
+                        },
+                        "description": "",
+                        "dueOn": "2026-06-08T00:00:00Z",
+                        "title": "Sprint 1",
+                        "updatedAt": "2026-06-09T00:51:03Z"
+                    }
+                }
+            }
+        ]
+    }
+},
+{
+    "nameWithOwner": "stackiq-team/stackiq",
+    "issues": {
+        "totalCount": 8,
+        "pageInfo": {
+            "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0yM1QwMDo1NDoyN1rPAAAAAQyY6Xo=",
+            "hasNextPage": true
+        },
+        "edges": [
+            {
+                "cursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNS0yM1QwMDo1NDoyN1rPAAAAAQyY6Xo=",
+                "node": {
+                    "title": "Parsing des dépendances via interface",
+                    "url": "https://github.com/stackiq-team/stackiq/issues/7",
+                    "bodyText": "ST03 — Parsing des dépendances via interface\nTâches\n\nImplémenter le parsing du fichier package.json\nExtraire :\n\ndependencies\ndevDependencies\n\n\nDistinguer les types de dépendances\nGérer les erreurs de parsing\nPréparer une architecture extensible pour les futurs parsers\n\nTests\n\npackage.json valide\npackage.json invalide\npackage.json vide\nValidation des dependencies et devDependencies\n\nLivrables\n\nService de parsing stable",
+                    "bodyHTML": "<h2 dir=\"auto\">ST03 — Parsing des dépendances via interface</h2>\n<h3 dir=\"auto\">Tâches</h3>\n<ul dir=\"auto\">\n<li>Implémenter le parsing du fichier <code class=\"notranslate\">package.json</code></li>\n<li>Extraire :\n<ul dir=\"auto\">\n<li>dependencies</li>\n<li>devDependencies</li>\n</ul>\n</li>\n<li>Distinguer les types de dépendances</li>\n<li>Gérer les erreurs de parsing</li>\n<li>Préparer une architecture extensible pour les futurs parsers</li>\n</ul>\n<h3 dir=\"auto\">Tests</h3>\n<ul dir=\"auto\">\n<li>package.json valide</li>\n<li>package.json invalide</li>\n<li>package.json vide</li>\n<li>Validation des <code class=\"notranslate\">dependencies</code> et <code class=\"notranslate\">devDependencies</code></li>\n</ul>\n<h3 dir=\"auto\">Livrables</h3>\n<ul dir=\"auto\">\n<li>Service de parsing stable</li>\n</ul>",
+                    "author": {
+                        "login": "amine-12",
+                        "url": "https://github.com/amine-12",
+                        "__typename": "User"
+                    },
+                    "authorAssociation": "MEMBER",
+                    "publishedAt": "2026-05-23T00:54:27Z",
+                    "closedAt": "2026-06-04T01:17:57Z",
+                    "lastEditedAt": null,
+                    "reactionGroups": [
+                        {
+                            "content": "THUMBS_UP",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "THUMBS_DOWN",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "LAUGH",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HOORAY",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "CONFUSED",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HEART",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "ROCKET",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "EYES",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        }
+                    ],
+                    "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                    },
+                    "assignees": {
+                        "totalCount": 1
+                    },
+                    "items": {
+                        "totalCount": 9,
+                        "pageInfo": {
+                            "endCursor": "Y3Vyc29yOnYyOpPPAAABnpA1ZVgBqzI2MzE1MzUwMjY3",
+                            "hasNextPage": false
+                        },
+                        "edges": [
+                            {
+                                "node": {
+                                    "__typename": "MilestonedEvent",
+                                    "id": "MIE_lADOSVbUEM8AAAABDJjpes8AAAAGBiuLdA",
+                                    "createdAt": "2026-05-23T00:54:28Z",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "milestoneTitle": "Sprint 1"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AddedToProjectV2Event"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ConnectedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AssignedEvent",
+                                    "id": "AE_lADOSVbUEM8AAAABDJjpes8AAAAGIHeqJw",
+                                    "createdAt": "2026-06-04T00:46:30Z",
+                                    "actor": {
+                                        "login": "LawrenceLiang02",
+                                        "url": "https://github.com/LawrenceLiang02",
+                                        "__typename": "User"
+                                    },
+                                    "assignee": {
+                                        "login": "EcoleThomas",
+                                        "url": "https://github.com/EcoleThomas"
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ClosedEvent",
+                                    "id": "CE_lADOSVbUEM8AAAABDJjpes8AAAAGIIRYzQ",
+                                    "createdAt": "2026-06-04T01:17:58Z",
+                                    "stateReason": "COMPLETED",
+                                    "actor": {
+                                        "login": "amine-12",
+                                        "url": "https://github.com/amine-12",
+                                        "__typename": "User"
+                                    },
+                                    "closer": {
+                                        "__typename": "PullRequest",
+                                        "id": "PR_kwDOSVbUEM7iaWvp",
+                                        "url": "https://github.com/stackiq-team/stackiq/pull/14",
+                                        "merged": true,
+                                        "baseRepository": {
+                                            "name": "stackiq",
+                                            "nameWithOwner": "stackiq-team/stackiq"
+                                        },
+                                        "state": "MERGED",
+                                        "isCrossRepository": false,
+                                        "author": {
+                                            "login": "EcoleThomas",
+                                            "url": "https://github.com/EcoleThomas",
+                                            "__typename": "User"
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            }
+                        ]
+                    },
+                    "closed": true,
+                    "locked": false,
+                    "includesCreatedEdit": false,
+                    "number": 7,
+                    "id": "I_kwDOSVbUEM8AAAABDJjpeg",
+                    "databaseId": 4506315130,
+                    "milestone": {
+                        "number": 1,
+                        "closed": false,
+                        "closedAt": null,
+                        "createdAt": "2026-05-13T01:05:58Z",
+                        "creator": {
+                            "login": "JethroRoy",
+                            "url": "https://github.com/JethroRoy",
+                            "__typename": "User"
+                        },
+                        "description": "",
+                        "dueOn": "2026-06-08T00:00:00Z",
+                        "title": "Sprint 1",
+                        "updatedAt": "2026-06-09T00:51:03Z"
+                    }
+                }
+            }
+        ]
+    }
+},
+{
+    "nameWithOwner": "stackiq-team/stackiq",
+    "issues": {
+        "totalCount": 8,
+        "pageInfo": {
+            "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNi0wMVQyMzoyMDoyMlrPAAAAARA4AYo=",
+            "hasNextPage": true
+        },
+        "edges": [
+            {
+                "cursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNi0wMVQyMzoyMDoyMlrPAAAAARA4AYo=",
+                "node": {
+                    "title": "Feat: Add github token generation",
+                    "url": "https://github.com/stackiq-team/stackiq/issues/12",
+                    "bodyText": "Résumé\nNeed github token generation for future integration of issuemining and github miner librairies.\nProblème / motivation\nGithub miner and issue miner do multiple requests to github API and need multiple tokens to make it work.\nSolution proposée\nAdding a github token generator in the backend\nSolutions alternatives envisagées (optionnel)\nNo response\nRisques et impact (optionnel)\nNo response\nCritères d'acceptation\n\n Implémentation de la fonctionnalité ajoutée\n Tests unitaires et E2E ajoutés\n Docs mises à jour (README / CHANGELOG)\n\nPriorité\nP2 - moyenne\nInformation supplémentaire / captures d'écran (optionnel)\nNo response",
+                    "bodyHTML": "<h3 dir=\"auto\">Résumé</h3>\n<p dir=\"auto\">Need github token generation for future integration of issuemining and github miner librairies.</p>\n<h3 dir=\"auto\">Problème / motivation</h3>\n<p dir=\"auto\">Github miner and issue miner do multiple requests to github API and need multiple tokens to make it work.</p>\n<h3 dir=\"auto\">Solution proposée</h3>\n<p dir=\"auto\">Adding a github token generator in the backend</p>\n<h3 dir=\"auto\">Solutions alternatives envisagées (optionnel)</h3>\n<p dir=\"auto\"><em>No response</em></p>\n<h3 dir=\"auto\">Risques et impact (optionnel)</h3>\n<p dir=\"auto\"><em>No response</em></p>\n<h3 dir=\"auto\">Critères d'acceptation</h3>\n<ul class=\"contains-task-list\">\n<li class=\"task-list-item\"><input type=\"checkbox\" id=\"\" disabled=\"\" class=\"task-list-item-checkbox\" aria-label=\"Completed task\" checked=\"\"> Implémentation de la fonctionnalité ajoutée</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" id=\"\" disabled=\"\" class=\"task-list-item-checkbox\" aria-label=\"Incomplete task\"> Tests unitaires et E2E ajoutés</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" id=\"\" disabled=\"\" class=\"task-list-item-checkbox\" aria-label=\"Incomplete task\"> Docs mises à jour (README / CHANGELOG)</li>\n</ul>\n<h3 dir=\"auto\">Priorité</h3>\n<p dir=\"auto\">P2 - moyenne</p>\n<h3 dir=\"auto\">Information supplémentaire / captures d'écran (optionnel)</h3>\n<p dir=\"auto\"><em>No response</em></p>",
+                    "author": {
+                        "login": "JethroRoy",
+                        "url": "https://github.com/JethroRoy",
+                        "__typename": "User"
+                    },
+                    "authorAssociation": "MEMBER",
+                    "publishedAt": "2026-06-01T23:20:22Z",
+                    "closedAt": "2026-06-09T00:51:03Z",
+                    "lastEditedAt": null,
+                    "reactionGroups": [
+                        {
+                            "content": "THUMBS_UP",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "THUMBS_DOWN",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "LAUGH",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HOORAY",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "CONFUSED",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HEART",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "ROCKET",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "EYES",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        }
+                    ],
+                    "labels": {
+                        "totalCount": 1,
+                        "nodes": [
+                            {
+                                "createdAt": "2026-05-06T01:44:08Z",
+                                "name": "feature",
+                                "isDefault": false
+                            }
+                        ]
+                    },
+                    "assignees": {
+                        "totalCount": 1
+                    },
+                    "items": {
+                        "totalCount": 10,
+                        "pageInfo": {
+                            "endCursor": "Y3Vyc29yOnYyOpPPAAABnqncjMABqzI2NDk4Mzk0MDcw",
+                            "hasNextPage": false
+                        },
+                        "edges": [
+                            {
+                                "node": {
+                                    "__typename": "MilestonedEvent",
+                                    "id": "MIE_lADOSVbUEM8AAAABEDgBis8AAAAGGk6Qbg",
+                                    "createdAt": "2026-06-01T23:20:22Z",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "milestoneTitle": "Sprint 1"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AssignedEvent",
+                                    "id": "AE_lADOSVbUEM8AAAABEDgBis8AAAAGGk6QlA",
+                                    "createdAt": "2026-06-01T23:20:23Z",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "assignee": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy"
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "IssueTypeAddedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AddedToProjectV2Event"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "LabeledEvent",
+                                    "id": "LE_lADOSVbUEM8AAAABEDgBis8AAAAGGk6TGw",
+                                    "createdAt": "2026-06-01T23:20:24Z",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "label": {
+                                        "name": "feature",
+                                        "createdAt": "2026-05-06T01:44:08Z",
+                                        "url": "https://github.com/stackiq-team/stackiq/labels/feature",
+                                        "isDefault": false
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "IssueComment",
+                                    "id": "IC_kwDOSVbUEM8AAAABFXTB-w",
+                                    "url": "https://github.com/stackiq-team/stackiq/issues/12#issuecomment-4654940667",
+                                    "createdAt": "2026-06-09T00:51:03Z",
+                                    "updatedAt": "2026-06-09T00:51:03Z",
+                                    "bodyText": "Token generation not possible for github api",
+                                    "bodyHTML": "<p dir=\"auto\">Token generation not possible for github api</p>",
+                                    "isMinimized": false,
+                                    "lastEditedAt": null,
+                                    "minimizedReason": null,
+                                    "databaseId": 4654940667,
+                                    "editor": null,
+                                    "author": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "authorAssociation": "MEMBER",
+                                    "publishedAt": "2026-06-09T00:51:03Z",
+                                    "reactionGroups": [
+                                        {
+                                            "content": "THUMBS_UP",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "THUMBS_DOWN",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "LAUGH",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "HOORAY",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "CONFUSED",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "HEART",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "ROCKET",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        },
+                                        {
+                                            "content": "EYES",
+                                            "createdAt": null,
+                                            "users": {
+                                                "totalCount": 0
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ClosedEvent",
+                                    "id": "CE_lADOSVbUEM8AAAABEDgBis8AAAAGK21jrw",
+                                    "createdAt": "2026-06-09T00:51:03Z",
+                                    "stateReason": "COMPLETED",
+                                    "actor": {
+                                        "login": "JethroRoy",
+                                        "url": "https://github.com/JethroRoy",
+                                        "__typename": "User"
+                                    },
+                                    "closer": null
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            }
+                        ]
+                    },
+                    "closed": true,
+                    "locked": false,
+                    "includesCreatedEdit": false,
+                    "number": 12,
+                    "id": "I_kwDOSVbUEM8AAAABEDgBig",
+                    "databaseId": 4567073162,
+                    "milestone": {
+                        "number": 1,
+                        "closed": false,
+                        "closedAt": null,
+                        "createdAt": "2026-05-13T01:05:58Z",
+                        "creator": {
+                            "login": "JethroRoy",
+                            "url": "https://github.com/JethroRoy",
+                            "__typename": "User"
+                        },
+                        "description": "",
+                        "dueOn": "2026-06-08T00:00:00Z",
+                        "title": "Sprint 1",
+                        "updatedAt": "2026-06-09T00:51:03Z"
+                    }
+                }
+            }
+        ]
+    }
+},
+{
+    "nameWithOwner": "stackiq-team/stackiq",
+    "issues": {
+        "totalCount": 8,
+        "pageInfo": {
+            "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNi0wNFQwMDo0NTo1NFrPAAAAARFGHno=",
+            "hasNextPage": false
+        },
+        "edges": [
+            {
+                "cursor": "Y3Vyc29yOnYyOpK0MjAyNi0wNi0wNFQwMDo0NTo1NFrPAAAAARFGHno=",
+                "node": {
+                    "title": "Feat: Add analysis result page",
+                    "url": "https://github.com/stackiq-team/stackiq/issues/15",
+                    "bodyText": "Résumé\nAdd analysis result page to display output of the analysis\nProblème / motivation\nDisplay page for analysis\nSolution proposée\nAdd analysis result page to display output of the analysis\nSolutions alternatives envisagées (optionnel)\nNo response\nRisques et impact (optionnel)\nNo response\nCritères d'acceptation\n\n Implémentation de la fonctionnalité ajoutée\n Tests unitaires et E2E ajoutés\n Docs mises à jour (README / CHANGELOG)\n\nPriorité\nP2 - moyenne\nInformation supplémentaire / captures d'écran (optionnel)\nNo response",
+                    "bodyHTML": "<h3 dir=\"auto\">Résumé</h3>\n<p dir=\"auto\">Add analysis result page to display output of the analysis</p>\n<h3 dir=\"auto\">Problème / motivation</h3>\n<p dir=\"auto\">Display page for analysis</p>\n<h3 dir=\"auto\">Solution proposée</h3>\n<p dir=\"auto\">Add analysis result page to display output of the analysis</p>\n<h3 dir=\"auto\">Solutions alternatives envisagées (optionnel)</h3>\n<p dir=\"auto\"><em>No response</em></p>\n<h3 dir=\"auto\">Risques et impact (optionnel)</h3>\n<p dir=\"auto\"><em>No response</em></p>\n<h3 dir=\"auto\">Critères d'acceptation</h3>\n<ul class=\"contains-task-list\">\n<li class=\"task-list-item\"><input type=\"checkbox\" id=\"\" disabled=\"\" class=\"task-list-item-checkbox\" aria-label=\"Incomplete task\"> Implémentation de la fonctionnalité ajoutée</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" id=\"\" disabled=\"\" class=\"task-list-item-checkbox\" aria-label=\"Incomplete task\"> Tests unitaires et E2E ajoutés</li>\n<li class=\"task-list-item\"><input type=\"checkbox\" id=\"\" disabled=\"\" class=\"task-list-item-checkbox\" aria-label=\"Incomplete task\"> Docs mises à jour (README / CHANGELOG)</li>\n</ul>\n<h3 dir=\"auto\">Priorité</h3>\n<p dir=\"auto\">P2 - moyenne</p>\n<h3 dir=\"auto\">Information supplémentaire / captures d'écran (optionnel)</h3>\n<p dir=\"auto\"><em>No response</em></p>",
+                    "author": {
+                        "login": "LawrenceLiang02",
+                        "url": "https://github.com/LawrenceLiang02",
+                        "__typename": "User"
+                    },
+                    "authorAssociation": "MEMBER",
+                    "publishedAt": "2026-06-04T00:45:54Z",
+                    "closedAt": "2026-06-07T00:53:18Z",
+                    "lastEditedAt": null,
+                    "reactionGroups": [
+                        {
+                            "content": "THUMBS_UP",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "THUMBS_DOWN",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "LAUGH",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HOORAY",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "CONFUSED",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "HEART",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "ROCKET",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        },
+                        {
+                            "content": "EYES",
+                            "createdAt": null,
+                            "users": {
+                                "totalCount": 0
+                            }
+                        }
+                    ],
+                    "labels": {
+                        "totalCount": 1,
+                        "nodes": [
+                            {
+                                "createdAt": "2026-05-06T01:44:08Z",
+                                "name": "feature",
+                                "isDefault": false
+                            }
+                        ]
+                    },
+                    "assignees": {
+                        "totalCount": 1
+                    },
+                    "items": {
+                        "totalCount": 7,
+                        "pageInfo": {
+                            "endCursor": "Y3Vyc29yOnYyOpPPAAABnp-98XABqzI2NDMyMTA2NzA0",
+                            "hasNextPage": false
+                        },
+                        "edges": [
+                            {
+                                "node": {
+                                    "__typename": "LabeledEvent",
+                                    "id": "LE_lADOSVbUEM8AAAABEUYees8AAAAGIHdlOA",
+                                    "createdAt": "2026-06-04T00:45:56Z",
+                                    "actor": {
+                                        "login": "LawrenceLiang02",
+                                        "url": "https://github.com/LawrenceLiang02",
+                                        "__typename": "User"
+                                    },
+                                    "label": {
+                                        "name": "feature",
+                                        "createdAt": "2026-05-06T01:44:08Z",
+                                        "url": "https://github.com/stackiq-team/stackiq/labels/feature",
+                                        "isDefault": false
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AddedToProjectV2Event"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "AssignedEvent",
+                                    "id": "AE_lADOSVbUEM8AAAABEUYees8AAAAGIHdpAA",
+                                    "createdAt": "2026-06-04T00:45:59Z",
+                                    "actor": {
+                                        "login": "LawrenceLiang02",
+                                        "url": "https://github.com/LawrenceLiang02",
+                                        "__typename": "User"
+                                    },
+                                    "assignee": {
+                                        "login": "LawrenceLiang02",
+                                        "url": "https://github.com/LawrenceLiang02"
+                                    }
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ProjectV2ItemStatusChangedEvent"
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "ClosedEvent",
+                                    "id": "CE_lADOSVbUEM8AAAABEUYees8AAAAGJ3Gr-w",
+                                    "createdAt": "2026-06-07T00:53:18Z",
+                                    "stateReason": "COMPLETED",
+                                    "actor": {
+                                        "login": "LawrenceLiang02",
+                                        "url": "https://github.com/LawrenceLiang02",
+                                        "__typename": "User"
+                                    },
+                                    "closer": null
+                                }
+                            },
+                            {
+                                "node": {
+                                    "__typename": "MilestonedEvent",
+                                    "id": "MIE_lADOSVbUEM8AAAABEUYees8AAAAGJ3nw0A",
+                                    "createdAt": "2026-06-07T01:41:26Z",
+                                    "actor": {
+                                        "login": "LawrenceLiang02",
+                                        "url": "https://github.com/LawrenceLiang02",
+                                        "__typename": "User"
+                                    },
+                                    "milestoneTitle": "Sprint 1"
+                                }
+                            }
+                        ]
+                    },
+                    "closed": true,
+                    "locked": false,
+                    "includesCreatedEdit": false,
+                    "number": 15,
+                    "id": "I_kwDOSVbUEM8AAAABEUYeeg",
+                    "databaseId": 4584775290,
+                    "milestone": {
+                        "number": 1,
+                        "closed": false,
+                        "closedAt": null,
+                        "createdAt": "2026-05-13T01:05:58Z",
+                        "creator": {
+                            "login": "JethroRoy",
+                            "url": "https://github.com/JethroRoy",
+                            "__typename": "User"
+                        },
+                        "description": "",
+                        "dueOn": "2026-06-08T00:00:00Z",
+                        "title": "Sprint 1",
+                        "updatedAt": "2026-06-09T00:51:03Z"
+                    }
+                }
+            }
+        ]
+    }
+}
+]
