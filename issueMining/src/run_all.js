@@ -14,22 +14,16 @@ const encoded = `${owner}~${repo}`;
 const issueJson = `../data/issues~${encoded}~.json`;
 
 try {
-    console.log("Running issue.js...");
     execSync(`node issues.js ${input} ${startDate}`, { stdio: 'inherit' });
 
-    console.log("Running summarize.js...");
     execSync(`node summarize.js ${issueJson}`, { stdio: 'inherit' });
 
-    console.log("Running classify.js...");
     execSync(`node classify.js ../data/issues_res.json`, { stdio: 'inherit' });
 
-    console.log("Running analyze.js...");
     execSync(`node analyze.js`, { stdio: 'inherit' });
 
-    console.log("Running count.js");
     execSync(`node count.js ../data/issues_res.json`, { stdio: 'inherit' });
 
-    console.log("Pipeline terminée avec succès.");
 } catch (error) {
-    console.error("Erreur durant l’exécution :", error.message);
+    console.error("Erreur durant l'exécution :", error.message);
 }

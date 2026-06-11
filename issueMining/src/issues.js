@@ -3,7 +3,6 @@ const { projectQuery, issueItemQuery } = require('./queries');
 const { graphql } = require("@octokit/graphql");
 const fs = require('fs');
 require('dotenv').config();
-console.log('Token loaded:', !!process.env.GITHUB_API_TOKEN);
 
 // GitHub access token(s) for authentication
 const tokens = [`${process.env.GITHUB_API_TOKEN}`];
