@@ -1,15 +1,6 @@
 // Load environment variables and required modules
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
-const fs = require('fs');
-const dataDir = process.env.DATA_DIR || path.join(__dirname, '../data');
-
-// Define output file and clear previous content
-const outputCsvPath = path.join(dataDir, 'classifications.csv');
-fs.writeFileSync(outputCsvPath, 'id,classification\n');
-
-// Load issue data
-const fileName = require(path.join(dataDir, '../data/issues_res.json'));
 
 function containsInactivityHint(issue) {
     const inactivityPatterns = [
@@ -32,41 +23,43 @@ function containsInactivityHint(issue) {
     );
 }
 
-
-// Classify all issues and write results to CSV
-async function classifyIssues(fileName) {
-    const data = eval(fileName); // Ideally replaced with safer alternative
-    const keys = Object.keys(data);
+/**
+ * Memory-based classifier
+ * Input: summarized issues object
+ * Output: { [issueNumber]: "fixed_by_devs" | "inactivity" | "other" }
+ */
+function classifyIssues(data) {
+    const result = {};
     const toClassify = [];
 
-    for (let key of keys) {
+    for (const key of Object.keys(data)) {
         const issue = data[key];
 
-        // classify localy without the need of the API
-        if (issue.isClosedByPR || issue.isClosedByCommit || issue.isProbablyClosedByPR) {
-            fs.appendFileSync(outputCsvPath, `${issue.number},fixed_by_devs\n`);
-        } else if (
+        if (
+            issue.isClosedByPR ||
+            issue.isClosedByCommit ||
+            issue.isProbablyClosedByPR
+        ) {
+            result[issue.number] = "fixed_by_devs";
+        }
+
+        else if (
             (issue.closed_by?.login || '').toLowerCase().includes('bot') ||
             containsInactivityHint(issue)
         ) {
-            fs.appendFileSync(outputCsvPath, `${issue.number},inactivity\n`);
-        } else {
-            toClassify.push({ number: issue.number, ...issue });
+            result[issue.number] = "inactivity";
         }
 
+        else {
+            toClassify.push(issue);
+        }
     }
 
-    for (let issue of toClassify) {
-        fs.appendFileSync(outputCsvPath, `${issue.number},other\n`);
+    for (const issue of toClassify) {
+        result[issue.number] = "other";
     }
+
+    return result;
 }
 
-// Gracefully handle manual interruption
-process.on('SIGINT', () => {
-    process.exit();
-});
-
-// Start the classification process
-(async () => {
-    await classifyIssues(fileName);
-})();
+module.exports = classifyIssues;

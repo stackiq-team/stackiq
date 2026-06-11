@@ -1,38 +1,41 @@
-const fs = require('fs');
 const path = require('path');
-const dataDir = process.env.DATA_DIR || path.join(__dirname, '../data');
 
-// Input and output file paths
-const inputFilePath = path.join(dataDir, 'classifications.csv');
-const outputFilePath = path.join(dataDir, 'classification_stats.csv');
+function analyzeClassifications(classifications) {
+    const stats = {};
+    let total = 0;
 
-// Read and parse the input CSV file, skipping the header
-const data = fs.readFileSync(inputFilePath, 'utf-8').trim().split('\n').slice(1);
+    // classifications: { issueNumber: "fixed_by_devs" | "inactivity" | "other" }
+    for (const issueId of Object.keys(classifications)) {
+        const classification = classifications[issueId];
 
-const stats = {}; // Object to hold classification counts
-let total = 0;     // Total number of valid classifications
+        if (!classification) continue;
 
-// Count occurrences of each classification label
-for (let line of data) {
-    const [, classification] = line.split(',');
+        stats[classification] = (stats[classification] || 0) + 1;
+        total++;
+    }
 
-    if (!classification) continue;
+    const rows = Object.entries(stats)
+        .sort((a, b) => b[1] - a[1])
+        .map(([label, count]) => {
+            const percent = ((count / total) * 100).toFixed(1);
+            return {
+                label,
+                count,
+                percentage: `${percent}%`
+            };
+        });
 
-    stats[classification] = (stats[classification] || 0) + 1;
-    total++;
-}
-
-// Prepare CSV content for the output
-// Format: label,count,percentage
-const header = 'label,count,percentage';
-const rows = Object.entries(stats)
-    .sort((a, b) => b[1] - a[1])
-    .map(([label, count]) => {
-        const percent = ((count / total) * 100).toFixed(1);
-        return `${label},${count},${percent}%`;
+    rows.push({
+        label: "Total",
+        count: total,
+        percentage: "100%"
     });
 
-rows.push(`Total,${total},100%`);
+    return {
+        total,
+        stats,
+        breakdown: rows
+    };
+}
 
-// Write the results to a new CSV file
-fs.writeFileSync(outputFilePath, [header, ...rows].join('\n'), 'utf-8');
+module.exports = analyzeClassifications;

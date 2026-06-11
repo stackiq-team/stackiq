@@ -12,17 +12,30 @@ const owner = process.argv[2];
 const repo = process.argv[3];
 const startDate = process.argv[4];
 
-const input = `${owner}/${repo}`;
-const encoded = `${owner}~${repo}`;
-const issueJson = path.join(dataDir, `issues~${encoded}~.json`);
-const env = { ...process.env, DATA_DIR: dataDir };
+async function run() {
+    try {
+        const issuesModule = require('./issues');
 
-try {
-    execSync(`node ${path.join(scriptsDir, 'issues.js')} ${input} ${startDate}`, { stdio: 'inherit', env });
-    execSync(`node ${path.join(scriptsDir, 'summarize.js')} ${issueJson}`, { stdio: 'inherit', env });
-    execSync(`node ${path.join(scriptsDir, 'classify.js')} ${path.join(dataDir, 'issues_res.json')}`, { stdio: 'inherit', env });
-    execSync(`node ${path.join(scriptsDir, 'analyze.js')}`, { stdio: 'inherit', env });
-    execSync(`node ${path.join(scriptsDir, 'count.js')} ${path.join(dataDir, 'issues_res.json')}`, { stdio: 'inherit', env });
-} catch (error) {
-    console.error("Erreur durant l'exécution :", error.message);
+        const issues = await issuesModule.getIssues(owner, repo, startDate);
+
+        const summarize = require('./summarize');
+        const summarized = summarize(issues);
+
+        const classify = require('./classify');
+        const classified = classify(summarized);
+
+        const analyze = require('./analyze');
+        const analyzed = analyze(classified);
+
+        const count = require('./count');
+        const result = count(summarized);
+
+        console.log(JSON.stringify(analyzed, null, 2));
+
+    } catch (err) {
+        console.error("Erreur durant l'exécution :", err.message);
+        process.exit(1);
+    }
 }
+
+run();
