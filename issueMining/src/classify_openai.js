@@ -1,10 +1,12 @@
 // Load environment variables and required modules
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 const axios = require('axios');
 const fs = require('fs');
+const dataDir = process.env.DATA_DIR || path.join(__dirname, '../data');
 
 // Define output file and clear previous content
-const outputCsvPath = '../data/classifications.csv';
+const outputCsvPath = path.join(dataDir, 'classifications.csv');
 fs.writeFileSync(outputCsvPath, 'id,classification\n');
 
 // Helper to wait between API retries
@@ -26,7 +28,7 @@ const axiosInstance = axios.create({
 });
 
 // Load issue data
-const fileName = require('../data/issues_res.json');
+const fileName = require(path.join(dataDir, '../data/issues_res.json'));
 
 // Send issues to ChatGPT for classification
 async function classifyWithChatGPT(issueBatch) {

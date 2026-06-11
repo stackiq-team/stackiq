@@ -1,33 +1,31 @@
-// Required modules and GraphQL queries
 const { projectQuery, issueItemQuery } = require('./queries');
 const { graphql } = require("@octokit/graphql");
 const fs = require('fs');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+const dataDir = process.env.DATA_DIR || path.join(__dirname, '../data');
 
-// GitHub access token(s) for authentication
 const tokens = [`${process.env.GITHUB_API_TOKEN}`];
-const tokenReset = tokens.map(() => "0"); // Store reset timestamps per token
-const tokenRemaining = tokens.map(() => -1); // Store remaining request quota per token
-let tokenNum = 0; // Index of the current token in use
+const tokenReset = tokens.map(() => "0");
+const tokenRemaining = tokens.map(() => -1);
+let tokenNum = 0;
 
-// Configuration for pagination and repository traversal
-let endingProjectIndex = 300; // Limit how many projects to process
-let currentProjectIndex = 0; // Index of the current project
-let currentCursor = ""; // Cursor for paginated issue results
-let nbItemsPerQuery = 100; // Number of items to query per request
-let tracking = {}; // Track how many issues were fetched per repository
+let endingProjectIndex = 300;
+let currentProjectIndex = 0;
+let currentCursor = "";
+let nbItemsPerQuery = 100;
+let tracking = {};
 
 let input = "";
 let output = "";
+let start_date = "";
 
-// Initialize the GraphQL client with the first token
 let graphqlWithAuth = graphql.defaults({
   headers: {
     authorization: `token ${tokens[0]}`
   }
 });
 
-// Recursive function to fetch issues for a list of repositories
 async function executeQuery0(projects, index, cursor, startDate) {
   try {
     if (index >= endingProjectIndex) return;
@@ -38,7 +36,6 @@ async function executeQuery0(projects, index, cursor, startDate) {
     if (!(repoFullName in tracking)) tracking[repoFullName] = 0;
     if (tracking[repoFullName]++ > 20000) return;
 
-    // Switch tokens if the current one is about to be throttled
     while (tokenRemaining[tokenNum] !== -1 && tokenRemaining[tokenNum] < 5) {
       if (tokenReset[tokenNum] === "0") break;
       if (Date.now() > new Date(tokenReset[tokenNum]).getTime()) break;
@@ -51,7 +48,6 @@ async function executeQuery0(projects, index, cursor, startDate) {
       });
     }
 
-    // Execute the main GraphQL query to fetch issues
     const { repository, rateLimit } = await graphqlWithAuth(projectQuery(projectOwner, projectName, cursor, startDate));
     tokenReset[tokenNum] = rateLimit.resetAt;
     tokenRemaining[tokenNum] = rateLimit.remaining;
@@ -71,7 +67,6 @@ async function executeQuery0(projects, index, cursor, startDate) {
         }
       };
 
-      // If there are more items to fetch for a single issue, fetch them recursively
       if (node?.items?.totalCount > nbItemsPerQuery && node.items.pageInfo?.hasNextPage) {
         const extraItems = await getItems(projectOwner, projectName, cursor, node.items.pageInfo.endCursor, node.items.edges);
         idata.issues.edges[0].node.items.edges = extraItems;
@@ -85,7 +80,6 @@ async function executeQuery0(projects, index, cursor, startDate) {
       fs.appendFile(output, json, 'utf8', () => {});
     }
 
-    // Move to the next cursor or next project
     let nextIndex = index;
     if (pageInfo.hasNextPage) cursor = pageInfo.endCursor;
     else if (index < projects.length - 1) {
@@ -96,13 +90,13 @@ async function executeQuery0(projects, index, cursor, startDate) {
     return executeQuery0(projects, nextIndex, cursor, startDate);
 
   } catch (err) {
-    fs.appendFile(output + "_errors.txt", `#${index}: *${projects[index]}* | ${cursor}\n`, 'utf8', () => {});
-    nbItemsPerQuery = 1; // Fallback to 1 item per query in case of repeated errors
+    console.error('Error:', err.message);
+    fs.appendFile(path.join(dataDir, `issues~${input.replace("/", "~")}~_errors.txt`), `#${index}: *${projects[index]}* | ${cursor}\n`, 'utf8', () => {});
+    nbItemsPerQuery = 1;
     setTimeout(() => executeQuery0(projects, index, cursor, startDate), 5000);
   }
 }
 
-// Recursively fetch paginated items from a single issue
 async function getItems(owner, name, cursor, nextCursor, items) {
   try {
     const { repository } = await graphqlWithAuth(issueItemQuery(owner, name, cursor, nextCursor));
@@ -123,7 +117,6 @@ async function getItems(owner, name, cursor, nextCursor, items) {
   }
 }
 
-// Read a list of repositories from a file and process them
 async function executeQueries(srcFile) {
   fs.readFile(srcFile, 'utf8', (err, data) => {
     if (err) return;
@@ -132,11 +125,10 @@ async function executeQueries(srcFile) {
   });
 }
 
-// CLI entry point
 if (process.argv.length < 5) {
   input = process.argv[2];
   start_date = process.argv[3] || "";
-  output = `../data/issues~${input.replace("/", "~")}~.json`;
+  output = path.join(dataDir, `issues~${input.replace("/", "~")}~.json`);
   try { fs.unlinkSync(output); } catch (e) {}
   executeQuery0([input], currentProjectIndex, currentCursor, start_date);
 } else {
@@ -144,7 +136,6 @@ if (process.argv.length < 5) {
   executeQueries(input);
 }
 
-// Close JSON file cleanly when the process exits
 process.on('exit', () => {
   try {
     const content = fs.readFileSync(output, 'utf8').trim();
