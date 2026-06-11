@@ -99,4 +99,4 @@ function analyzeExternalLinks(issues) {
     };
 }
 
-module.exports = analyzeExternalLinks;
+export default analyzeExternalLinks;

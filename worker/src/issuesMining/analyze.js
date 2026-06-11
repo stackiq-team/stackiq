@@ -1,5 +1,3 @@
-const path = require('path');
-
 function analyzeClassifications(classifications) {
     const stats = {};
     let total = 0;
@@ -38,4 +36,4 @@ function analyzeClassifications(classifications) {
     };
 }
 
-module.exports = analyzeClassifications;
+export default analyzeClassifications;

@@ -1,7 +1,10 @@
-const { projectQuery, issueItemQuery } = require('./queries');
-const { graphql } = require("@octokit/graphql");
-const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+import { projectQuery, issueItemQuery } from './queries.js';
+import { graphql } from '@octokit/graphql';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+dotenv.config();
+
 const tokens = [`${process.env.GITHUB_API_TOKEN}`];
 const tokenReset = tokens.map(() => "0");
 const tokenRemaining = tokens.map(() => -1);
@@ -143,7 +146,7 @@ async function getItems(owner, name, cursor, nextCursor, items) {
   }
 }
 
-async function getIssues(owner, repo, startDate) {
+export async function getIssues(owner, repo, startDate) {
   issues = {};
 
   const projects = [`${owner}/${repo}`];
@@ -157,7 +160,3 @@ async function getIssues(owner, repo, startDate) {
 
   return Object.values(issues);
 }
-
-module.exports = {
-  getIssues
-};

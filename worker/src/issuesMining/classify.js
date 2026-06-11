@@ -1,7 +1,3 @@
-// Load environment variables and required modules
-const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../.env') });
-
 function containsInactivityHint(issue) {
     const inactivityPatterns = [
         /closed\s+due\s+to\s+inactivity/i,
@@ -62,4 +58,4 @@ function classifyIssues(data) {
     return result;
 }
 
-module.exports = classifyIssues;
+export default classifyIssues;

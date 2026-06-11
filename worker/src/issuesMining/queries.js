@@ -1093,4 +1093,4 @@ function issueItemQuery(_owner, _name, _cursor, _ccursor) {
   `;
 }
 
-module.exports = { projectQuery, issueItemQuery };
+export { projectQuery, issueItemQuery };

@@ -1,6 +1,3 @@
-// Required modules
-const path = require('path');
-
 // Sets to track how issues were closed
 let closed_bypr = new Set();
 let closed_bycommit = new Set();
@@ -290,4 +287,4 @@ function summarizeIssues(data) {
     );
 }
 
-module.exports = summarizeIssues;
+export default summarizeIssues;

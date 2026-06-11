@@ -1,6 +1,7 @@
 // Load environment variables and required modules
+/*
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+require('dotenv').config();
 const axios = require('axios');
 const fs = require('fs');
 const dataDir = process.env.DATA_DIR || path.join(__dirname, '../data');
@@ -179,3 +180,4 @@ process.on('SIGINT', () => {
 (async () => {
     await classifyIssues(fileName);
 })();
+*/
