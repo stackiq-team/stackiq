@@ -135,8 +135,12 @@ export default function ResultPage() {
                 </thead>
                 <tbody>
                   {analysis.result.dependencyScores.map((entry) => (
-                    <tr key={`${entry.dependency.name}-${entry.dependency.type}`}>
-                      <td>{entry.dependency.name}</td>
+                    <tr key={`${entry.dependency.name}-${entry.dependency.type}`} className="clickable-row">
+                      <td>
+                        <Link to={`/results/${analysis.resultToken}/dependency/${encodeURIComponent(entry.dependency.name)}`}>
+                          {entry.dependency.name}
+                        </Link>
+                      </td>
                       <td>{entry.dependency.versionRequirement}</td>
                       <td>{entry.dependency.type}</td>
                       <td>{entry.score}</td>

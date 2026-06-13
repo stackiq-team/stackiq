@@ -100,6 +100,26 @@ th {
 	background: #f8f9fb;
 }
 
+.clickable-row {
+	cursor: pointer;
+	transition: background-color 0.2s ease;
+}
+
+.clickable-row:hover {
+	background-color: #f0f4f8;
+}
+
+.clickable-row a {
+	color: inherit;
+	text-decoration: none;
+	display: block;
+}
+
+.clickable-row a:hover {
+	color: #2563eb;
+	text-decoration: underline;
+}
+
 .risk-low {
 	color: #166534;
 	font-weight: 700;
