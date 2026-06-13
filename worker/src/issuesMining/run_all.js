@@ -4,33 +4,38 @@ import classify from './classify.js';
 import analyze from './analyze.js';
 import count from './count.js';
 
-if (process.argv.length < 5) {
+export async function analyzeIssues(owner, repo, startDate) {
+  const issues = await getIssues(owner, repo, startDate);
+
+  const summarized = summarize(issues);
+  const classified = classify(summarized);
+  const analyzed = analyze(classified);
+  const countResult = count(summarized);
+
+  return {
+    raw: summarized,
+    classifications: analyzed,
+    countResult
+  };
+}
+
+if (process.argv[1].endsWith('run_all.js')) {
+  if (process.argv.length < 5) {
     console.error("Usage: node run_all.js <owner> <repo> <start_date>");
     process.exit(1);
-}
+  }
 
-const owner = process.argv[2];
-const repo = process.argv[3];
-const startDate = process.argv[4];
+  const [owner, repo, startDate] = process.argv.slice(2);
 
-async function run() {
+  async function run() {
     try {
-        const issues = await getIssues(owner, repo, startDate);
-
-        const summarized = summarize(issues);
-
-        const classified = classify(summarized);
-
-        const analyzed = analyze(classified);
-
-        const countResult = count(summarized);
-
-        console.log(JSON.stringify({ classifications: analyzed, countResult }, null, 2))
-
+      const result = await analyzeIssues(owner, repo, startDate);
+      console.log(JSON.stringify(result, null, 2));
     } catch (err) {
-        console.error("Erreur durant l'exécution :", err.message);
-        process.exit(1);
+      console.error("Erreur durant l'exécution :", err.message);
+      process.exit(1);
     }
-}
+  }
 
-run();
+  run();
+}
