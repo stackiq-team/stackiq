@@ -3,6 +3,7 @@ import summarize from './summarize.js';
 import classify from './classify.js';
 import analyze from './analyze.js';
 import count from './count.js';
+import fs from 'fs';
 
 export async function analyzeIssues(owner, repo, startDate) {
   const issues = await getIssues(owner, repo, startDate);
@@ -13,7 +14,7 @@ export async function analyzeIssues(owner, repo, startDate) {
   const countResult = count(summarized);
 
   return {
-    raw: summarized,
+    raw: issues,
     classifications: analyzed,
     countResult
   };
@@ -30,7 +31,11 @@ if (process.argv[1].endsWith('run_all.js')) {
   async function run() {
     try {
       const result = await analyzeIssues(owner, repo, startDate);
-      console.log(JSON.stringify(result, null, 2));
+      
+      const filename = `${repo}_issues_raw.json`;
+      fs.writeFileSync(filename, JSON.stringify(result.raw, null, 2));
+      console.log(`[output] Written to ${filename}`);
+      
     } catch (err) {
       console.error("Erreur durant l'exécution :", err.message);
       process.exit(1);
