@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 
 # Prisma Generated Files
 backend/src/generated/prisma/
+
+# Issueminer generated data
+issueMining/data/
