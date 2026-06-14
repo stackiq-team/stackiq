@@ -11,7 +11,7 @@ function projectQuery(_owner, _name, _cursor, since) {
     {
       repository(owner: "${_owner}", name: "${_name}") {
         nameWithOwner
-        issues(first: 1${cursor},states:CLOSED, filterBy: {since:"${sinceDate}"}) {
+        issues(first: 1${cursor}, filterBy: {since:"${sinceDate}"}) {
           totalCount
           edges {
             cursor
@@ -596,7 +596,7 @@ function issueItemQuery(_owner, _name, _cursor, _ccursor) {
     {
         repository(owner: "${_owner}", name: "${_name}") {
           nameWithOwner
-          issues(first: 1${cursor},states:CLOSED) {
+          issues(first: 1${cursor}) {
             totalCount
             pageInfo {
                 endCursor
