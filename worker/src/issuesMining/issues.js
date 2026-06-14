@@ -5,7 +5,9 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const tokens = [`${process.env.GITHUB_API_TOKEN}`];
+const ROTATION_THRESHOLD = 300;
+
+const tokens = process.env.GITHUB_API_TOKEN.split(',').map(t => t.trim()).filter(Boolean);
 const tokenReset = tokens.map(() => "0");
 const tokenRemaining = tokens.map(() => -1);
 let tokenNum = 0;
@@ -22,6 +24,47 @@ let graphqlWithAuth = graphql.defaults({
   }
 });
 
+function switchToken() {
+  const startToken = tokenNum;
+  do {
+    tokenNum = (tokenNum + 1) % tokens.length;
+    if (tokenRemaining[tokenNum] === -1 || tokenRemaining[tokenNum] > ROTATION_THRESHOLD) {
+      // console.log(`[tokens] Switched to token ${tokenNum}`);
+      graphqlWithAuth = graphql.defaults({
+        headers: { authorization: `token ${tokens[tokenNum]}` }
+      });
+      return true;
+    }
+  } while (tokenNum !== startToken);
+
+  return false;
+}
+
+async function checkAllTokens() {
+  for (let i = 0; i < tokens.length; i++) {
+    const { rateLimit } = await graphql(
+      `query { rateLimit { limit remaining resetAt } }`,
+      { headers: { authorization: `token ${tokens[i]}` } }
+    );
+    tokenRemaining[i] = rateLimit.remaining;
+    tokenReset[i] = rateLimit.resetAt;
+    const resetIn = Math.ceil((new Date(rateLimit.resetAt) - new Date()) / 1000 / 60);
+    // console.log(`[tokens] Token ${i}: ${rateLimit.remaining}/${rateLimit.limit} remaining — resets in ${resetIn} min`);
+  }
+
+  // pick the token with the most remaining
+  const best = tokenRemaining.indexOf(Math.max(...tokenRemaining));
+  tokenNum = best;
+  graphqlWithAuth = graphql.defaults({
+    headers: { authorization: `token ${tokens[best]}` }
+  });
+  // console.log(`[tokens] Starting with token ${best} (${tokenRemaining[best]} remaining)`);
+
+  if (tokenRemaining[best] < ROTATION_THRESHOLD) {
+    throw new Error(`All tokens are below ${ROTATION_THRESHOLD} remaining. Wait for reset before running.`);
+  }
+}
+
 let issues = {};
 
 async function executeQuery0(projects, index, cursor, startDate) {
@@ -36,16 +79,13 @@ async function executeQuery0(projects, index, cursor, startDate) {
     if (!(repoFullName in tracking)) tracking[repoFullName] = 0;
     if (tracking[repoFullName]++ > 20000) return;
 
-    while (tokenRemaining[tokenNum] !== -1 && tokenRemaining[tokenNum] < 5) {
-      if (tokenReset[tokenNum] === "0") break;
-      if (Date.now() > new Date(tokenReset[tokenNum]).getTime()) break;
-
-      tokenNum = (tokenNum + 1) % tokens.length;
-      graphqlWithAuth = graphql.defaults({
-        headers: {
-          authorization: `token ${tokens[tokenNum]}`
-        }
-      });
+    // rotate if current token is running low
+    if (tokenRemaining[tokenNum] !== -1 && tokenRemaining[tokenNum] <= ROTATION_THRESHOLD) {
+      console.log(`[tokens] Token ${tokenNum} low (${tokenRemaining[tokenNum]} remaining), rotating...`);
+      const switched = switchToken();
+      if (!switched) {
+        throw new Error('All GitHub API tokens exhausted. Wait for reset before continuing.');
+      }
     }
 
     const { repository, rateLimit } = await graphqlWithAuth(
@@ -54,6 +94,7 @@ async function executeQuery0(projects, index, cursor, startDate) {
 
     tokenReset[tokenNum] = rateLimit.resetAt;
     tokenRemaining[tokenNum] = rateLimit.remaining;
+    // console.log(`[tokens] Token ${tokenNum}: ${rateLimit.remaining} remaining`);
 
     const edges = repository.issues.edges;
     const pageInfo = repository.issues.pageInfo;
@@ -148,6 +189,9 @@ async function getItems(owner, name, cursor, nextCursor, items) {
 
 export async function getIssues(owner, repo, startDate) {
   issues = {};
+  tracking = {};
+
+  await checkAllTokens();
 
   const projects = [`${owner}/${repo}`];
 

@@ -1,22 +1,21 @@
 import { getIssues } from './issues.js';
 import summarize from './summarize.js';
-import classify from './classify.js';
 import analyze from './analyze.js';
-import count from './count.js';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function analyzeIssues(owner, repo, startDate) {
   const issues = await getIssues(owner, repo, startDate);
 
   const summarized = summarize(issues);
-  const classified = classify(summarized);
-  const analyzed = analyze(classified);
-  const countResult = count(summarized);
+  const analyzed = analyze(summarized);
 
   return {
-    raw: issues,
+    raw: summarized,
     classifications: analyzed,
-    countResult
   };
 }
 
@@ -32,8 +31,8 @@ if (process.argv[1].endsWith('run_all.js')) {
     try {
       const result = await analyzeIssues(owner, repo, startDate);
       
-      const filename = `${repo}_issues_raw.json`;
-      fs.writeFileSync(filename, JSON.stringify(result.raw, null, 2));
+      const filename = path.join(__dirname, 'data', `${repo}_issues_result.json`);
+      fs.writeFileSync(filename, JSON.stringify(result, null, 2));
       console.log(`[output] Written to ${filename}`);
       
     } catch (err) {

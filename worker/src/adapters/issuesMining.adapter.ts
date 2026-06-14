@@ -14,23 +14,6 @@ const nullMetrics: IssuesMiningMetrics = {
   uncodedCloseRate: null,
 };
 
-/*Eample code
-
-const metrics: IssuesMiningMetrics = {
-totalIssuesAnalyzed: result.classifications?.total ?? null,
-openIssues: result.classifications?.stats?.open ?? null,
-closedIssues: result.classifications?.stats?.closed ?? null,
-recentActivityCount: result.classifications?.stats?.recent_activity ?? null,
-averageResolutionTimeHours: null,
-closeRateByPR: null,
-codeResolutionRate: result.classifications?.stats
-  ? result.classifications.stats.fixed_by_devs / result.classifications.total
-  : null,
-openToAssignedTimeHours: null,
-mergedPRRate: null,
-uncodedCloseRate: null,
-};*/
-
 export async function runIssuesMining(
   owner: string,
   repo: string,
@@ -39,9 +22,22 @@ export async function runIssuesMining(
   try {
     const result = await analyzeIssues(owner, repo, sinceDate);
 
+    const metrics: IssuesMiningMetrics = {
+      totalIssuesAnalyzed: result.classifications?.totalIssuesAnalyzed ?? null,
+      openIssues: result.classifications?.openIssues ?? null,
+      closedIssues: result.classifications?.closedIssues ?? null,
+      recentActivityCount: result.classifications?.recentActivityCount ?? null,
+      averageResolutionTimeHours: result.classifications?.averageResolutionTimeHours ?? null,
+      closeRateByPR: result.classifications?.closeRateByPR ?? null,
+      codeResolutionRate: result.classifications?.codeResolutionRate ?? null,
+      openToAssignedTimeHours: result.classifications?.openToAssignedTimeHours ?? null,
+      mergedPRRate: result.classifications?.mergedPRRate ?? null,
+      uncodedCloseRate: result.classifications?.uncodedCloseRate ?? null,
+    };
+
     return {
       status: 'SUCCESS',
-      metrics: nullMetrics,   // replaced with real computation later
+      metrics,
       rawData: result.raw,
     };
 
