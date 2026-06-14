@@ -146,4 +146,5 @@ vite.config.ts.timestamp-*
 backend/src/generated/prisma/
 
 # IssuesMining generated data
-worker/src/issuesMining/data/
+worker/src/issuesMining/data/*
+!worker/src/issuesMining/data/.gitkeep
