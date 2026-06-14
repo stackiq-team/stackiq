@@ -3,6 +3,9 @@ import type { IssuesMiningResult, IssuesMiningMetrics } from '../types/issuesMin
 
 const nullMetrics: IssuesMiningMetrics = {
   totalIssuesAnalyzed: null,
+  openIssues: null,
+  closedIssues: null,
+  recentActivityCount: null,
   averageResolutionTimeHours: null,
   closeRateByPR: null,
   codeResolutionRate: null,
@@ -11,16 +14,21 @@ const nullMetrics: IssuesMiningMetrics = {
   uncodedCloseRate: null,
 };
 
-/*const metrics: IssuesMiningMetrics = {
-  totalIssuesAnalyzed: result.classifications?.total ?? null,
-  averageResolutionTimeHours: null,
-  closeRateByPR: null,
-  codeResolutionRate: result.classifications?.stats
-    ? result.classifications.stats.fixed_by_devs / result.classifications.total
-    : null,
-  openToAssignedTimeHours: null,
-  mergedPRRate: null,
-  uncodedCloseRate: null,
+/*Eample code
+
+const metrics: IssuesMiningMetrics = {
+totalIssuesAnalyzed: result.classifications?.total ?? null,
+openIssues: result.classifications?.stats?.open ?? null,
+closedIssues: result.classifications?.stats?.closed ?? null,
+recentActivityCount: result.classifications?.stats?.recent_activity ?? null,
+averageResolutionTimeHours: null,
+closeRateByPR: null,
+codeResolutionRate: result.classifications?.stats
+  ? result.classifications.stats.fixed_by_devs / result.classifications.total
+  : null,
+openToAssignedTimeHours: null,
+mergedPRRate: null,
+uncodedCloseRate: null,
 };*/
 
 export async function runIssuesMining(
