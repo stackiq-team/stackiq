@@ -144,10 +144,10 @@ describe("analysis flow", () => {
       const packageJson = {
         name: "frontend",
         dependencies: {
-          react: "^19.2.6",
+          "react-bootstrap-country-select": "^19.2.6",
         },
         devDependencies: {
-          vitest: "^4.1.7",
+          "radix-select-vitest": "^4.1.7",
         },
       };
 

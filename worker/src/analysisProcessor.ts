@@ -5,6 +5,8 @@ import {
   scoreDependencies,
   type DependencyInput,
 } from "./dependencyScore.js";
+import { fetchGitHubMinerData } from "./adapters/githubMinerAdapter.js";
+import type { GitHubMinerInput, GitHubMinerOutput } from "./types/githubMinerType.js";
 
 type AnalysisResultData = {
   globalScore: number;
@@ -51,6 +53,9 @@ type ProcessorOptions = {
   runAnalysis?: (
     data: AnalysisJobData & { dependencies: DependencyInput[] }
   ) => Promise<AnalysisResultData>;
+  runGitHubMiner?: (
+    data: GitHubMinerInput
+  ) => Promise<GitHubMinerOutput>;
   logger?: Pick<Console, "log" | "error">;
 };
 
@@ -58,7 +63,7 @@ export async function processAnalysisJob(
   job: Pick<Job<AnalysisJobData>, "id" | "data" | "attemptsMade">,
   options: ProcessorOptions
 ) {
-  const { prisma, runAnalysis = defaultRunAnalysis, logger = console } = options;
+  const { prisma, runAnalysis = defaultRunAnalysis, runGitHubMiner = defaultRunGitHubMiner, logger = console } = options;
   const { analysisId } = job.data;
 
   logger.log(
@@ -92,6 +97,18 @@ export async function processAnalysisJob(
 
   try {
     logger.log(`[worker] Analysis processing started: analysisId=${analysisId}`);
+
+    for (const dependency of analysis.dependencies) {
+      logger.log(
+        `[worker] Fetching GitHub data for dependency: analysisId=${analysisId}, dependencyId=${dependency.name}, versionRequirement=${dependency.versionRequirement}`
+      );
+      const gitHubData = await runGitHubMiner({
+        fullPackageName: dependency.name,
+        versionRequirement: dependency.versionRequirement,
+        dependencyId: dependency.id,
+      });
+      //TODO do something with gitHubData
+    }
 
     const result = await runAnalysis({
       analysisId,
@@ -169,4 +186,8 @@ async function defaultRunAnalysis(
   data: AnalysisJobData & { dependencies: DependencyInput[] }
 ): Promise<AnalysisResultData> {
   return scoreDependencies(data.dependencies);
+}
+
+async function defaultRunGitHubMiner(data: GitHubMinerInput): Promise<GitHubMinerOutput> {
+  return fetchGitHubMinerData(data);
 }
