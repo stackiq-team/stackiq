@@ -22,7 +22,14 @@
     "bullmq": "^5.77.6",
     "dotenv": "^17.4.2",
     "ioredis": "^5.11.0",
-    "pg": "^8.21.0"
+    "pg": "^8.21.0",
+    "@octokit/graphql": "^9.0.1",
+    "axios": "^1.9.0",
+    "cheerio": "^1.1.0",
+    "fs": "^0.0.1-security",
+    "json2csv": "^5.0.7",
+    "openai": "^4.6.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/ioredis": "^4.28.10",
