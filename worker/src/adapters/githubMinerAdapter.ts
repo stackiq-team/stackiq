@@ -1,57 +1,30 @@
 import type { GitHubMinerInput, GitHubMinerOutput, GitHubMinerRawData } from "../types/githubMinerType.js";
-import { exec } from 'child_process';
-import { mkdirSync } from 'fs';
-import { readFile } from 'fs/promises';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
-
+import {runGitHubMinerCommand} from '../gitHubMiner/index.js';
 
 export async function runGitHubMiner(
   dependency: GitHubMinerInput
-): Promise<{ success: boolean; message: string; data: any | null }> {
-  
-  //**-------------- ***/
-  //TODO: fix miner path with env variable in docker
-  const minerPath = 'D:/Ecole/gitHubMiner/index.js';
-  //**-------------- ***/
-  const outputDir = 'data';
-  const outputFile = `${outputDir}/${dependency.fullPackageName}-${dependency.versionRequirement}`;
-
-  mkdirSync(outputDir, { recursive: true });
-
-  const command = `node ${minerPath} --query "${dependency.fullPackageName}" --batchsize 10 --filename "${outputFile}"`;
-
-  console.log(`[githubMinerAdapter] Executing command: ${command}`);
-
+): Promise<string> {
   try {
-    const { stdout, stderr } = await execAsync(command);
-    if (stderr) {
-      console.error(`Command error output: ${stderr}`);
-    }
-
-    return {
-      success: true,
-      message: 'GitHub Miner executed successfully',
-      data: null,
-    };
+    console.log(`[githubMinerAdapter] Running GitHub miner for ${dependency.fullPackageName}@${dependency.versionRequirement}`);
+    const data = await runGitHubMinerCommand(
+      dependency.fullPackageName + "@" + dependency.versionRequirement,
+      10 // batch size
+    );
+    return JSON.stringify(data.raw);
   } catch (error: any) {
     console.error(`[githubMinerAdapter] Error executing command: ${error.message || error}`);
-    return {
-      success: false,
-      message: `Error executing GitHub Miner: ${error.message || error}`,
-      data: null,
-    };
+    // let caller handle absence of data; do not return a value
+    return "";
   }
 }
 
 export async function parseGitHubMinerData(
-    dependency: GitHubMinerInput
+  dependency: GitHubMinerInput,
+    rawData: string
   ): Promise<GitHubMinerOutput[]> {
-  const outputFilePath = `data/${dependency.fullPackageName}-${dependency.versionRequirement}.json`;
   try {
-    const rawDataFromFile = await readFile(outputFilePath, "utf-8");
-    const rawDataParsed = JSON.parse(rawDataFromFile) as GitHubMinerRawData[];
+    console.log(`[githubMinerAdapter] Raw data to parse: ${rawData[0]}`);
+    const rawDataParsed = JSON.parse(rawData) as GitHubMinerRawData[];
 
     const dependencyOutputs = rawDataParsed.map((dependencyData) => ({
       dependencyId: dependency.dependencyId,
@@ -84,9 +57,9 @@ export async function parseGitHubMinerData(
 }
 
 export async function fetchGitHubMinerData(dependency: GitHubMinerInput) : Promise<GitHubMinerOutput> {
-  await runGitHubMiner(dependency);
+  const data = await runGitHubMiner(dependency);
 
-  const gitHubMinerData = await parseGitHubMinerData(dependency);
+  const gitHubMinerData = await parseGitHubMinerData(dependency, data);
 
   if (gitHubMinerData.length === 0) {
     throw new Error(
