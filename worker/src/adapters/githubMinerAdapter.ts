@@ -1,6 +1,13 @@
 import type { GitHubMinerInput, GitHubMinerOutput, GitHubMinerRawData } from "../types/githubMinerType.js";
 import {runGitHubMinerCommand} from '../gitHubMiner/index.js';
 
+function projectAgeDays(createdAt: string | null | undefined) {
+  if (!createdAt) return null;
+  const created = new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - created.getTime()) / 86400000));
+}
+
 export async function runGitHubMiner(
   dependency: GitHubMinerInput
 ): Promise<string> {
@@ -26,29 +33,45 @@ export async function parseGitHubMinerData(
     console.log(`[githubMinerAdapter] Raw data to parse: ${rawData[0]}`);
     const rawDataParsed = JSON.parse(rawData) as GitHubMinerRawData[];
 
-    const dependencyOutputs = rawDataParsed.map((dependencyData) => ({
-      dependencyId: dependency.dependencyId,
-      packageName: dependency.fullPackageName,
-      repository: {
-        owner: dependencyData.owner,
-        name: dependencyData.name,
-        description: dependencyData.description,
-        fullName: `${dependencyData.owner}/${dependencyData.name}`,
-        url: dependencyData.url,
+    const dependencyOutputs = rawDataParsed.map((dependencyData) => {
+      const output: GitHubMinerOutput = {
+        dependencyId: dependency.dependencyId,
+        packageName: dependency.fullPackageName,
+        repository: {
+          owner: dependencyData.owner,
+          name: dependencyData.name,
+          description: dependencyData.description,
+          fullName: `${dependencyData.owner}/${dependencyData.name}`,
+          url: dependencyData.url,
+          createdAt: dependencyData.createdAt,
+        },
+        stars: dependencyData.stars,
+        forks: dependencyData.forks,
+        watchers: dependencyData.watchers,
+        contributors: dependencyData.users,
         createdAt: dependencyData.createdAt,
-      },
-      stars: dependencyData.stars,
-      forks: dependencyData.forks,
-      watchers: dependencyData.watchers,
-      contributors: dependencyData.users,
-      pullRequests: dependencyData.pullRequests,
-      issues: dependencyData.issues,
-      license: dependencyData.license,
-      languages: dependencyData.languages,
-      primaryLanguage: dependencyData.primaryLanguage,
-      topics: dependencyData.topics,
-      created_at: dependencyData.createdAt,
-    }));
+        projectAgeDays: projectAgeDays(dependencyData.createdAt),
+        pullRequests: dependencyData.pullRequests,
+        issues: dependencyData.issues,
+        license: dependencyData.license,
+        languages: dependencyData.languages,
+        primaryLanguage: dependencyData.primaryLanguage,
+        topics: dependencyData.topics,
+        created_at: dependencyData.createdAt,
+      };
+
+      if (dependencyData.repositoryMatchSource) {
+        output.repositoryMatchSource = dependencyData.repositoryMatchSource;
+      }
+      if (dependencyData.repositoryMatchConfidence) {
+        output.repositoryMatchConfidence = dependencyData.repositoryMatchConfidence;
+      }
+      if (dependencyData.npm) {
+        output.npm = dependencyData.npm;
+      }
+
+      return output;
+    });
     return dependencyOutputs;
   } catch (error) {
     console.error('Failed to read or parse JSON:', error);
@@ -68,6 +91,13 @@ export async function fetchGitHubMinerData(dependency: GitHubMinerInput) : Promi
   }
 
   let bestMatch = gitHubMinerData[0]!; // default to the first result if no better match is found
+  const highConfidenceMatch = gitHubMinerData.find(
+    (data) => data.repositoryMatchConfidence === "HIGH"
+  );
+  if (highConfidenceMatch) {
+    return highConfidenceMatch;
+  }
+
   gitHubMinerData.forEach((data) => {
     // name has an exact match we found the right package
     if (data.repository.fullName === dependency.fullPackageName) {

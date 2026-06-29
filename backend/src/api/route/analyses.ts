@@ -75,13 +75,9 @@ router.post(
     const startedAt = Date.now();
 
     try {
-      const email = req.body.email as string;
+      const providedEmail = typeof req.body.email === "string" ? req.body.email.trim() : "";
+      const email = providedEmail.length > 0 ? providedEmail : null;
       const file = req.file;
-
-      if (!email) {
-        console.warn("[backend] Analysis create rejected: missing email");
-        return res.status(400).json({ message: "Email is required" });
-      }
 
       if (!file) {
         console.warn(`[backend] Analysis create rejected for ${email}: missing file`);

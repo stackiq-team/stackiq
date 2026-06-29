@@ -1,6 +1,6 @@
 // queries.js
 
-const nbItemsPerQuery = 100;
+const nbItemsPerQuery = Number(process.env.ISSUES_MINING_TIMELINE_ITEMS ?? 15);
 
 function projectQuery(_owner, _name, _cursor, since) {
   let cursor = _cursor !== "" ? `, after:"${_cursor}"` : "";
