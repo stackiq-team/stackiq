@@ -2,10 +2,19 @@ export interface IssuesMiningMetrics {
   totalIssuesAnalyzed: number | null;
   openIssues: number | null;
   closedIssues: number | null;
+  closedIssuesAnalyzed: number | null;
   recentActivityCount: number | null;     // issues opened or closed in the last 30 days
   averageResolutionTimeHours: number | null;
+  averageResolutionTimeDays: number | null;
+  averageFirstResponseTimeDays: number | null;
+  firstResponseTimeHours: number | null;
+  closureRate: number | null;
+  noResponseRate: number | null;
   closeRateByPR: number | null;           // 0-1 ratio
+  closedByPrRate: number | null;
+  closedByPRRate: number | null;
   codeResolutionRate: number | null;      // closeByPR + closeByCommit combined
+  postCloseActivityRate: number | null;
   openToAssignedTimeHours: number | null;
   mergedPRRate: number | null;            // of PR-closed issues, how many were actually merged
   uncodedCloseRate: number | null;        // ratio of issues closed with no code reference
