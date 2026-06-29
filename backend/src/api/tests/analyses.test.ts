@@ -117,6 +117,70 @@ describe("POST /analyses", () => {
     });
   });
 
+  it("creates an analysis when email is omitted", async () => {
+    prismaMock.analysis.create.mockResolvedValueOnce({
+      id: "analysis-1",
+      email: null,
+      status: "PENDING",
+      resultToken: "result-token-1",
+      errorMessage: null,
+      dependencies: [
+        {
+          id: "dependency-1",
+          analysisId: "analysis-1",
+          name: "react",
+          versionRequirement: "^19.0.0",
+          type: "DEPENDENCY",
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .post("/analyses")
+      .attach(
+        "file",
+        Buffer.from(
+          JSON.stringify({
+            name: "frontend",
+            dependencies: {
+              react: "^19.0.0",
+            },
+          })
+        ),
+        "stack.json"
+      );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.analysis).toMatchObject({
+      id: "analysis-1",
+      email: null,
+      status: "PENDING",
+      resultToken: "result-token-1",
+    });
+
+    expect(prismaMock.analysis.create).toHaveBeenCalledWith({
+      data: {
+        email: null,
+        status: "PENDING",
+        dependencies: {
+          create: [
+            {
+              name: "react",
+              versionRequirement: "^19.0.0",
+              type: "DEPENDENCY",
+            },
+          ],
+        },
+      },
+      include: {
+        dependencies: true,
+      },
+    });
+    expect(enqueueAnalysisJobMock).toHaveBeenCalledWith({
+      analysisId: "analysis-1",
+    });
+  });
+
   it("rejects a package file with no dependencies", async () => {
     const response = await request(app)
       .post("/analyses")

@@ -25,9 +25,7 @@ export default function JsonDropZone() {
 
     setEmail(value);
 
-    if (value === "") {
-      setEmailError("Email is required.");
-    } else if (!validateEmail(value)) {
+    if (value !== "" && !validateEmail(value)) {
       setEmailError("Please enter a valid email address.");
     } else {
       setEmailError("");
@@ -109,7 +107,7 @@ export default function JsonDropZone() {
       return;
     }
 
-    if (!validateEmail(email)) {
+    if (email.trim() !== "" && !validateEmail(email)) {
       setEmailError("Please enter a valid email address.");
       return;
     }
@@ -152,7 +150,7 @@ export default function JsonDropZone() {
   return (
     <div className="container">
       <div className="emailSection">
-        <label className="emailLabel">Email Address</label>
+        <label className="emailLabel">Email Address (optional)</label>
 
         <input
           type="email"
