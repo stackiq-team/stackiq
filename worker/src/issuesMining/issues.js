@@ -6,10 +6,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const ROTATION_THRESHOLD = 300;
+const DEFAULT_MAX_ISSUES = 10;
+const DEFAULT_MAX_TIMELINE_PAGES = 1;
 
-const tokens = process.env.GITHUB_API_TOKEN.split(',').map(t => t.trim()).filter(Boolean);
-const tokenReset = tokens.map(() => "0");
-const tokenRemaining = tokens.map(() => -1);
+let tokens = [];
+let tokenReset = [];
+let tokenRemaining = [];
 let tokenNum = 0;
 
 let endingProjectIndex = 300;
@@ -18,11 +20,27 @@ let currentCursor = "";
 let nbItemsPerQuery = 100;
 let tracking = {};
 
-let graphqlWithAuth = graphql.defaults({
-  headers: {
-    authorization: `token ${tokens[0]}`
+let graphqlWithAuth = graphql.defaults({ headers: {} });
+
+function loadTokens() {
+  tokens = (process.env.GITHUB_API_TOKEN ?? '')
+    .split(',')
+    .map(t => t.trim())
+    .filter(Boolean);
+
+  if (tokens.length === 0) {
+    throw new Error('GITHUB_API_TOKEN is required to run issuesMining');
   }
-});
+
+  tokenReset = tokens.map(() => "0");
+  tokenRemaining = tokens.map(() => -1);
+  tokenNum = 0;
+  graphqlWithAuth = graphql.defaults({
+    headers: {
+      authorization: `token ${tokens[0]}`
+    }
+  });
+}
 
 function switchToken() {
   const startToken = tokenNum;
@@ -67,6 +85,16 @@ async function checkAllTokens() {
 
 let issues = {};
 
+function getMaxIssues() {
+  const configured = Number(process.env.ISSUES_MINING_MAX_ISSUES ?? DEFAULT_MAX_ISSUES);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_ISSUES;
+}
+
+function getMaxTimelinePages() {
+  const configured = Number(process.env.ISSUES_MINING_MAX_TIMELINE_PAGES ?? DEFAULT_MAX_TIMELINE_PAGES);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_TIMELINE_PAGES;
+}
+
 async function executeQuery0(projects, index, cursor, startDate) {
   try {
     if (index >= endingProjectIndex) return;
@@ -77,7 +105,11 @@ async function executeQuery0(projects, index, cursor, startDate) {
     const repoFullName = `${projectOwner}/${projectName}`;
 
     if (!(repoFullName in tracking)) tracking[repoFullName] = 0;
-    if (tracking[repoFullName]++ > 20000) return;
+    if (tracking[repoFullName] >= getMaxIssues()) {
+      console.log(`[issuesMining] Reached issue sample cap: repo=${repoFullName}, maxIssues=${getMaxIssues()}`);
+      return;
+    }
+    tracking[repoFullName]++;
 
     // rotate if current token is running low
     if (tokenRemaining[tokenNum] !== -1 && tokenRemaining[tokenNum] <= ROTATION_THRESHOLD) {
@@ -143,17 +175,16 @@ async function executeQuery0(projects, index, cursor, startDate) {
 
   } catch (err) {
     console.error('Error:', err.message);
-    nbItemsPerQuery = 1;
-
-    setTimeout(
-      () => executeQuery0(projects, index, cursor, startDate),
-      5000
-    );
+    throw err;
   }
 }
 
-async function getItems(owner, name, cursor, nextCursor, items) {
+async function getItems(owner, name, cursor, nextCursor, items, pageCount = 1) {
   try {
+    if (pageCount >= getMaxTimelinePages()) {
+      return items;
+    }
+
     const { repository } = await graphqlWithAuth(
       issueItemQuery(owner, name, cursor, nextCursor)
     );
@@ -176,7 +207,8 @@ async function getItems(owner, name, cursor, nextCursor, items) {
         name,
         cursor,
         itemPageInfo.endCursor,
-        items
+        items,
+        pageCount + 1
       );
     }
 
@@ -188,6 +220,7 @@ async function getItems(owner, name, cursor, nextCursor, items) {
 }
 
 export async function getIssues(owner, repo, startDate) {
+  loadTokens();
   issues = {};
   tracking = {};
 
@@ -202,5 +235,7 @@ export async function getIssues(owner, repo, startDate) {
     startDate
   );
 
-  return Object.values(issues);
+  const values = Object.values(issues);
+  console.log(`[issuesMining] Issue sample collected: repo=${owner}/${repo}, issues=${values.length}, maxIssues=${getMaxIssues()}`);
+  return values;
 }

@@ -1,57 +1,62 @@
 import { describe, expect, it, vi } from "vitest";
+
+const { runGitHubMinerCommandMock } = vi.hoisted(() => ({
+  runGitHubMinerCommandMock: vi.fn(),
+}));
+
+vi.mock("../gitHubMiner/index.js", () => ({
+  runGitHubMinerCommand: runGitHubMinerCommandMock,
+}));
+
 import { fetchGitHubMinerData, parseGitHubMinerData, runGitHubMiner } from "../adapters/githubMinerAdapter.js";
-import * as githubMinerAdapter from "../adapters/githubMinerAdapter.js";
 
+const rawRepository = {
+  name: "testDependency",
+  owner: "testOwner",
+  description: "testDescription",
+  url: "https://test.com/dependency/url",
+  createdAt: "2018-05-09",
+  users: 10,
+  watchers: 3,
+  stars: 70,
+  forks: 12,
+  issues: 5,
+  pullRequests: 4,
+  diskUsage: 55,
+  license: "MIT",
+  languages: ["JavaScript"],
+  primaryLanguage: "JavaScript",
+  environments: [],
+  submodules: [],
+  topics: ["react", "react-select"],
+  extra: [],
+};
 
+describe("GitHubMiner adapter", () => {
+  it("runs the GitHub miner command and returns raw repositories as JSON", async () => {
+    runGitHubMinerCommandMock.mockResolvedValue({ raw: [rawRepository] });
 
-describe("runGitHubMiner", () => {
-  it("Validate gitHubMiner command is running", async () => {
     const response = await runGitHubMiner({
-        fullPackageName: "react-bootstrap-country-select",
-        versionRequirement: "^17.0.0",
-        dependencyId: "testDependencyId",
-      });
-    const json = JSON.parse(response);
-    expect(json.length).toEqual(1);
+      fullPackageName: "testDependency",
+      versionRequirement: "^17.0.0",
+      dependencyId: "testDependencyId",
+    });
+
+    expect(JSON.parse(response)).toEqual([rawRepository]);
+    expect(runGitHubMinerCommandMock).toHaveBeenCalledWith("testDependency@^17.0.0", 10);
   });
 
-  it("parse gitHubMiner raw data", async () => {
-    const testData = [{
-      "name": "testDependency",
-      "owner": "testOwner",
-      "description": "testDescription",
-      "url": "https://test.com/dependency/url",
-      "createdAt": "2018-05-09",
-      "users": 1,
-      "watchers": 1,
-      "stars": 7,
-      "forks": 1,
-      "issues": 1,
-      "pullRequests": 0,
-      "diskUsage": 55,
-      "license": "MIT",
-      "languages": [
-        "JavaScript"
-      ],
-      "primaryLanguage": "JavaScript",
-      "environments": [],
-      "submodules": [],
-      "topics": [
-        "react",
-        "react-select",
-      ],
-      "extra": [
-        "styles",
-      ]
-    }];
-
-    const response = await parseGitHubMinerData({
+  it("normalizes GitHubMiner raw data", async () => {
+    const response = await parseGitHubMinerData(
+      {
         fullPackageName: "testDependency",
         versionRequirement: "1.0.0",
         dependencyId: "testDependencyId",
-      }, JSON.stringify(testData));
+      },
+      JSON.stringify([rawRepository])
+    );
 
-    expect(response).toEqual([{
+    expect(response[0]).toMatchObject({
       dependencyId: "testDependencyId",
       packageName: "testDependency",
       repository: {
@@ -60,81 +65,51 @@ describe("runGitHubMiner", () => {
         description: "testDescription",
         fullName: "testOwner/testDependency",
         url: "https://test.com/dependency/url",
-        createdAt: "2018-05-09"
+        createdAt: "2018-05-09",
       },
-      stars: 7,
-      forks: 1,
-      watchers: 1,
-      contributors: 1,
-      pullRequests: 0,
-      issues: 1,
+      stars: 70,
+      forks: 12,
+      watchers: 3,
+      contributors: 10,
+      createdAt: "2018-05-09",
+      pullRequests: 4,
+      issues: 5,
       license: "MIT",
       languages: ["JavaScript"],
       primaryLanguage: "JavaScript",
       topics: ["react", "react-select"],
-      created_at: "2018-05-09"
-    }]);
+      created_at: "2018-05-09",
+    });
+    expect(response[0]?.projectAgeDays).toEqual(expect.any(Number));
   });
 
-  it("run gitHubMiner service", async () => {
-    vi.spyOn(githubMinerAdapter, "runGitHubMiner").mockResolvedValue(JSON.stringify([{
-      "name": "testDependency",
-      "owner": "testOwner",
-      "description": "testDescription",
-      "url": "https://test.com/dependency/url",
-      "createdAt": "2018-05-09",
-      "users": 1,
-      "watchers": 1,
-      "stars": 7,
-      "forks": 1,
-      "issues": 1,
-      "pullRequests": 0,
-      "diskUsage": 55,
-      "license": "MIT",
-      "languages": [
-        "JavaScript"
+  it("selects the most popular repository when there is no exact match", async () => {
+    runGitHubMinerCommandMock.mockResolvedValue({
+      raw: [
+        { ...rawRepository, name: "low", stars: 1 },
+        { ...rawRepository, name: "high", stars: 99 },
       ],
-      "primaryLanguage": "JavaScript",
-      "environments": [],
-      "submodules": [],
-      "topics": [
-        "react",
-        "react-select",
-      ],
-      "extra": [
-        "styles",
-      ]
-    }]));
+    });
 
     const response = await fetchGitHubMinerData({
-        fullPackageName: "testDependency",
-        versionRequirement: "12.0.3",
-        dependencyId: "testDependencyId",
-      });
-
-    expect(response).toEqual({
+      fullPackageName: "testDependency",
+      versionRequirement: "12.0.3",
       dependencyId: "testDependencyId",
-      packageName: "testDependency",
-      repository: {
-        name: "Xunit.Extensions.TestDependency",
-        owner: "JDCain",
-        description: "Allow for dependent tests within Xunit 2.x",
-        fullName: "JDCain/Xunit.Extensions.TestDependency",
-        url: "https://github.com/JDCain/Xunit.Extensions.TestDependency",
-        createdAt: "2019-11-13"
-      },
-      stars: 1,
-      forks: 0,
-      watchers: 1,
-      contributors: 1,
-      pullRequests: 3,
-      issues: 6,
-      license: "",
-      languages: ["C#"],
-      primaryLanguage: "C#",
-      topics: [],
-      created_at: "2019-11-13"
     });
+
+    expect(response.repository.name).toBe("high");
+    expect(response.stars).toBe(99);
   });
 
-},30000);
+  it("throws when no repository is returned", async () => {
+    runGitHubMinerCommandMock.mockResolvedValue({ raw: [] });
+
+    await expect(
+      fetchGitHubMinerData({
+        fullPackageName: "missing",
+        versionRequirement: "1.0.0",
+        dependencyId: "dependency-1",
+      })
+    ).rejects.toThrow("No GitHub miner results found for missing@1.0.0");
+  });
+});

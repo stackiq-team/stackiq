@@ -5,14 +5,32 @@ const nullMetrics: IssuesMiningMetrics = {
   totalIssuesAnalyzed: null,
   openIssues: null,
   closedIssues: null,
+  closedIssuesAnalyzed: null,
   recentActivityCount: null,
   averageResolutionTimeHours: null,
+  averageResolutionTimeDays: null,
+  averageFirstResponseTimeDays: null,
+  firstResponseTimeHours: null,
+  closureRate: null,
+  noResponseRate: null,
   closeRateByPR: null,
+  closedByPrRate: null,
+  closedByPRRate: null,
   codeResolutionRate: null,
+  postCloseActivityRate: null,
   openToAssignedTimeHours: null,
   mergedPRRate: null,
   uncodedCloseRate: null,
 };
+
+function hoursToDays(hours: number | null | undefined) {
+  return hours == null ? null : hours / 24;
+}
+
+function ratio(numerator: number | null | undefined, denominator: number | null | undefined) {
+  if (numerator == null || denominator == null || denominator === 0) return null;
+  return numerator / denominator;
+}
 
 export async function runIssuesMining(
   owner: string,
@@ -26,10 +44,34 @@ export async function runIssuesMining(
       totalIssuesAnalyzed: result.classifications?.totalIssuesAnalyzed ?? null,
       openIssues: result.classifications?.openIssues ?? null,
       closedIssues: result.classifications?.closedIssues ?? null,
+      closedIssuesAnalyzed: result.classifications?.closedIssues ?? null,
       recentActivityCount: result.classifications?.recentActivityCount ?? null,
       averageResolutionTimeHours: result.classifications?.averageResolutionTimeHours ?? null,
+      averageResolutionTimeDays: hoursToDays(result.classifications?.averageResolutionTimeHours),
+      averageFirstResponseTimeDays: hoursToDays(
+        result.classifications?.firstResponseTimeHours ?? result.classifications?.openToAssignedTimeHours
+      ),
+      firstResponseTimeHours:
+        result.classifications?.firstResponseTimeHours ??
+        result.classifications?.openToAssignedTimeHours ??
+        null,
+      closureRate:
+        result.classifications?.closureRate ??
+        ratio(result.classifications?.closedIssues, result.classifications?.totalIssuesAnalyzed),
+      noResponseRate: result.classifications?.noResponseRate ?? null,
       closeRateByPR: result.classifications?.closeRateByPR ?? null,
+      closedByPrRate:
+        result.classifications?.closedByPrRate ??
+        result.classifications?.closedByPRRate ??
+        result.classifications?.closeRateByPR ??
+        null,
+      closedByPRRate:
+        result.classifications?.closedByPRRate ??
+        result.classifications?.closedByPrRate ??
+        result.classifications?.closeRateByPR ??
+        null,
       codeResolutionRate: result.classifications?.codeResolutionRate ?? null,
+      postCloseActivityRate: result.classifications?.postCloseActivityRate ?? null,
       openToAssignedTimeHours: result.classifications?.openToAssignedTimeHours ?? null,
       mergedPRRate: result.classifications?.mergedPRRate ?? null,
       uncodedCloseRate: result.classifications?.uncodedCloseRate ?? null,
