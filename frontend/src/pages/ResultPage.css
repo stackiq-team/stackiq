@@ -39,14 +39,49 @@
 	color: #991b1b;
 }
 
+.dependency-status {
+	display: inline-block;
+	border-radius: 999px;
+	padding: 4px 10px;
+	font-size: 12px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.dependency-status-pending {
+	background: #fff3cd;
+	color: #7a5b00;
+}
+
+.dependency-status-processing {
+	background: #dbeafe;
+	color: #1e40af;
+}
+
+.dependency-status-scored {
+	background: #dcfce7;
+	color: #166534;
+}
+
+.dependency-status-missing {
+	background: #fee2e2;
+	color: #991b1b;
+}
+
 .token-row {
 	color: #666;
 	word-break: break-all;
 }
 
+.polling-row {
+	margin: 6px 0 0;
+	color: #475569;
+	font-size: 13px;
+}
+
 .summary-grid {
 	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 16px;
 }
 
@@ -94,10 +129,25 @@ td {
 	padding: 10px;
 	border-bottom: 1px solid #eee;
 	text-align: left;
+	vertical-align: middle;
 }
 
 th {
 	background: #f8f9fb;
+}
+
+.repo-url-cell {
+	max-width: 260px;
+	word-break: break-all;
+}
+
+.repo-url-cell a {
+	color: #2563eb;
+	text-decoration: none;
+}
+
+.repo-url-cell a:hover {
+	text-decoration: underline;
 }
 
 .risk-low {
