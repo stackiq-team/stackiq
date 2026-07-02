@@ -10,6 +10,7 @@ RUN npm install
 COPY . .
 
 RUN npm run build
+RUN cp -r src/issuesMining dist/issuesMining
 
 FROM node:20-alpine
 
