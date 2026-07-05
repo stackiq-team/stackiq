@@ -217,34 +217,6 @@ export default function DependencyDetailPage() {
   const warnings = Array.isArray(dependency.scoreEntry?.warnings)
     ? dependency.scoreEntry.warnings
     : [];
-  const rawPayload = {
-    dependencyId: dependency.scoreEntry?.dependency.id ?? null,
-    packageName: dependency.name,
-    versionRequirement: dependency.versionRequirement,
-    type: dependency.type,
-    score: dependency.score,
-    riskLevel: dependency.riskLevel,
-    repositoryMatchSource: getStringValue(githubMetrics?.repositoryMatchSource),
-    repositoryMatchConfidence: getStringValue(githubMetrics?.repositoryMatchConfidence),
-    stars: typeof githubMetrics?.stars === "number" ? githubMetrics.stars : null,
-    watchers: typeof githubMetrics?.watchers === "number" ? githubMetrics.watchers : null,
-    forks: typeof githubMetrics?.forks === "number" ? githubMetrics.forks : null,
-    issues: typeof githubMetrics?.issues === "number" ? githubMetrics.issues : null,
-    topics,
-    license: getStringValue(githubMetrics?.license),
-    contributors: typeof githubMetrics?.contributors === "number" ? githubMetrics.contributors : null,
-    projectAgeDays:
-      typeof githubMetrics?.projectAgeDays === "number" ? githubMetrics.projectAgeDays : null,
-    pullRequests: typeof githubMetrics?.pullRequests === "number" ? githubMetrics.pullRequests : null,
-    createdAt: getStringValue(githubMetrics?.createdAt),
-    created_at: getStringValue(githubMetrics?.created_at),
-    primaryLanguage: getStringValue(githubMetrics?.primaryLanguage),
-    languages,
-    repository,
-    npm: npmMetrics,
-    issueMetrics,
-    warnings,
-  };
 
   return (
     <section className="dependency-detail-page">
