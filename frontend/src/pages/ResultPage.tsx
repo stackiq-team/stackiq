@@ -416,17 +416,17 @@ export default function ResultPage() {
         </>
       ) : (
         <>
-          <article className="summary-section">
-            <h2>{analysis.status === "FAILED" ? "Analysis Failed" : "Analysis In Progress"}</h2>
-            <p>
-              {analysis.result
-                ? analysis.result.summary
-                : "The analysis exists but results are not ready yet. Press refresh in a few moments."}
-            </p>
-          </article>
+          <div className="analysis-status-row">
+            <article className="summary-section analysis-status-info">
+              <h2>{analysis.status === "FAILED" ? "Analysis Failed" : "Analysis In Progress"}</h2>
+              <p>
+                {analysis.result
+                  ? analysis.result.summary
+                  : "The analysis exists but results are not ready yet. Press refresh in a few moments."}
+              </p>
+            </article>
 
-          <div className="summary-grid">
-            <article className="summary-card">
+            <article className="summary-card analysis-status-time">
               <h2>Elapsed Time</h2>
               <p>{analysisDuration}</p>
             </article>

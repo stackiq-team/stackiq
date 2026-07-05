@@ -50,6 +50,11 @@
 .button-back {
 	padding: 8px 16px;
 	font-size: 14px;
+	transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.button-back:hover {
+	transform: scale(1.05);
 }
 
 /* Info Section */
@@ -64,7 +69,7 @@
 .info-section h2 {
 	margin: 0 0 16px;
 	font-size: 18px;
-	color: #333;
+	color: #0f172a;
 }
 
 .info-grid {
@@ -82,7 +87,7 @@
 .info-label {
 	font-size: 12px;
 	font-weight: 700;
-	color: #666;
+	color: #111827;
 	text-transform: uppercase;
 }
 
@@ -101,7 +106,7 @@
 .metrics-section h2 {
 	margin: 0 0 16px;
 	font-size: 18px;
-	color: #333;
+	color: #0f172a;
 }
 
 .metrics-grid {
@@ -121,7 +126,7 @@
 	margin: 0 0 16px;
 	font-size: 14px;
 	font-weight: 700;
-	color: #666;
+	color: #111827;
 	text-transform: uppercase;
 }
 
@@ -188,6 +193,50 @@
 	flex-direction: column;
 }
 
+.metric-card-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 4px;
+}
+
+.metric-card-header h3 {
+	margin-bottom: 0;
+}
+
+.risk-info-button {
+	width: 28px;
+	height: 28px;
+	border: 0;
+	padding: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: #0f172a;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	transition: transform 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.risk-info-button svg {
+	width: 24px;
+	height: 24px;
+}
+
+.risk-info-button:hover {
+	background: #e2e8f0;
+	color: #020617;
+	transform: translateY(-1px);
+}
+
+.risk-info-button:focus-visible {
+	outline: 2px solid #2563eb;
+	outline-offset: 2px;
+}
+
 .risk-level {
 	font-size: 28px;
 	font-weight: 700;
@@ -230,12 +279,12 @@
 .github-section h2 {
 	margin: 0 0 16px;
 	font-size: 18px;
-	color: #333;
+	color: #0f172a;
 }
 
 .github-metrics {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 	gap: 12px;
 }
 
@@ -244,13 +293,14 @@
 	background: #f8f9fb;
 	border: 1px dashed #ddd;
 	border-radius: 8px;
-	text-align: center;
+	text-align: left;
+	box-sizing: border-box;
 }
 
 .metric-placeholder p {
 	margin: 0 0 12px;
 	font-size: 13px;
-	color: #666;
+	color: #111827;
 	font-weight: 500;
 }
 
@@ -270,6 +320,154 @@
 	text-decoration: underline;
 }
 
+.risk-modal-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	background: rgba(15, 23, 42, 0.62);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	backdrop-filter: blur(4px);
+}
+
+.risk-modal {
+	width: min(760px, 100%);
+	max-height: 90vh;
+	overflow: auto;
+	background: #fff;
+	border-radius: 18px;
+	box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+	border: 1px solid #e2e8f0;
+	padding: 22px;
+}
+
+.risk-modal-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 18px;
+}
+
+.risk-modal-kicker {
+	margin: 0 0 6px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: #2563eb;
+}
+
+.risk-modal-header h3 {
+	margin: 0;
+	font-size: 22px;
+	color: #0f172a;
+}
+
+.risk-modal-close {
+	width: 36px;
+	height: 36px;
+	border: 1px solid #cbd5e1;
+	border-radius: 999px;
+	background: #fff;
+	color: #cbd5e1;
+	cursor: pointer;
+	font-size: 24px;
+	line-height: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.risk-modal-close svg {
+	width: 18px;
+	height: 18px;
+}
+
+.risk-modal-close:hover {
+	transform: scale(1.05);
+	background: #f8fafc;
+	border-color: #94a3b8;
+}
+
+.risk-modal-close:hover svg {
+	color: #94a3b8;
+}
+
+.risk-modal-close:focus-visible {
+	outline: 2px solid #2563eb;
+	outline-offset: 2px;
+}
+
+.risk-modal-body {
+	display: grid;
+	gap: 16px;
+	color: #334155;
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.risk-modal-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.risk-modal-card,
+.risk-modal-notes {
+	border: 1px solid #e2e8f0;
+	border-radius: 14px;
+	background: #f8fafc;
+	padding: 16px;
+}
+
+.risk-modal-card h4,
+.risk-modal-notes h4 {
+	margin: 0 0 8px;
+	font-size: 15px;
+	color: #0f172a;
+}
+
+.risk-modal-card p,
+.risk-modal-notes p {
+	margin: 0 0 8px;
+	color: #334155;
+}
+
+.risk-modal-card p:last-child,
+.risk-modal-notes p:last-child {
+	margin-bottom: 0;
+}
+
+.risk-modal-notes ul {
+	margin: 0;
+	padding-left: 18px;
+	display: grid;
+	gap: 8px;
+	color: #334155;
+}
+
+.metric-placeholder-wide {
+	grid-column: 1 / -1;
+}
+
+.raw-json {
+	margin: 0;
+	padding: 14px;
+	border-radius: 8px;
+	background: #0f172a;
+	color: #e2e8f0;
+	overflow: auto;
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
 .warning-list {
 	list-style: disc;
 	margin: 0;
@@ -278,18 +476,10 @@
 	gap: 6px;
 }
 
-.metric-placeholder ul {
-	list-style: none;
-	margin: 0;
-	padding: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-
 .metric-placeholder li {
 	font-size: 12px;
-	color: #999;
+	color: #334155;
+	word-break: break-word;
 }
 
 /* Actions */
@@ -341,6 +531,10 @@
 		grid-template-columns: 1fr;
 	}
 
+	.metric-placeholder-wide {
+		grid-column: auto;
+	}
+
 	.score-value {
 		font-size: 32px;
 	}
@@ -352,5 +546,13 @@
 	.button-back {
 		width: 100%;
 		text-align: center;
+	}
+
+	.risk-modal {
+		padding: 18px;
+	}
+
+	.risk-modal-grid {
+		grid-template-columns: 1fr;
 	}
 }
