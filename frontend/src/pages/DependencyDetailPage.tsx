@@ -217,7 +217,7 @@ export default function DependencyDetailPage() {
   const warnings = Array.isArray(dependency.scoreEntry?.warnings)
     ? dependency.scoreEntry.warnings
     : [];
-  const rawPayload = {
+  const _rawPayload = {
     dependencyId: dependency.scoreEntry?.dependency.id ?? null,
     packageName: dependency.name,
     versionRequirement: dependency.versionRequirement,
