@@ -254,6 +254,30 @@
 	font-weight: 500;
 }
 
+.github-metric-value {
+	font-size: 13px;
+	color: #334155;
+	line-height: 1.5;
+	word-break: break-word;
+}
+
+.github-metric-value a {
+	color: #2563eb;
+	text-decoration: none;
+}
+
+.github-metric-value a:hover {
+	text-decoration: underline;
+}
+
+.warning-list {
+	list-style: disc;
+	margin: 0;
+	padding-left: 18px;
+	display: grid;
+	gap: 6px;
+}
+
 .metric-placeholder ul {
 	list-style: none;
 	margin: 0;

@@ -5,6 +5,7 @@ import type { AnalysisLookupResponse } from "../service/ApiService";
 import "./DependencyDetailPage.css";
 
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
+type ScoreEntry = NonNullable<AnalysisLookupResponse["analysis"]["result"]>["dependencyScores"][number];
 
 interface DependencyDetail {
   name: string;
@@ -12,6 +13,7 @@ interface DependencyDetail {
   type: "DEPENDENCY" | "DEV_DEPENDENCY";
   score: number;
   riskLevel: RiskLevel;
+  scoreEntry?: ScoreEntry;
 }
 
 function riskClassName(risk: RiskLevel): string {
@@ -21,9 +23,62 @@ function riskClassName(risk: RiskLevel): string {
 }
 
 function riskLabel(risk: RiskLevel): string {
-  if (risk === "LOW") return "Faible";
-  if (risk === "MEDIUM") return "Moyen";
-  return "Élevé";
+  if (risk === "LOW") return "Low";
+  if (risk === "MEDIUM") return "Medium";
+  return "High";
+}
+
+function getRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function getGithubMetrics(score?: ScoreEntry) {
+  const metrics = getRecord(score?.githubMetrics);
+  const issueMetrics = getRecord(score?.issueMetrics);
+
+  return {
+    stars: typeof metrics?.stars === "number" ? metrics.stars : null,
+    watchers: typeof metrics?.watchers === "number" ? metrics.watchers : null,
+    forks: typeof metrics?.forks === "number" ? metrics.forks : null,
+    openIssues:
+      typeof issueMetrics?.openIssues === "number" ? issueMetrics.openIssues : null,
+    closedIssues:
+      typeof issueMetrics?.closedIssues === "number" ? issueMetrics.closedIssues : null,
+    warnings: Array.isArray(score?.warnings) ? score?.warnings : [],
+  };
+}
+
+function formatMetric(value: number | null | undefined) {
+  return typeof value === "number" ? value.toLocaleString() : "-";
+}
+
+function getRepositoryUrl(score?: ScoreEntry) {
+  const metrics = getRecord(score?.githubMetrics);
+  const repository = getRecord(metrics?.repository);
+
+  const url = repository?.url;
+  if (typeof url === "string" && url.trim() !== "") {
+    return url;
+  }
+
+  const fullName = repository?.fullName;
+  if (typeof fullName === "string" && fullName.trim() !== "") {
+    return `https://github.com/${fullName}`;
+  }
+
+  const owner = repository?.owner;
+  const name = repository?.name;
+  if (
+    typeof owner === "string" &&
+    owner.trim() !== "" &&
+    typeof name === "string" &&
+    name.trim() !== ""
+  ) {
+    return `https://github.com/${owner}/${name}`;
+  }
+
+  return null;
 }
 
 export default function DependencyDetailPage() {
@@ -70,6 +125,7 @@ export default function DependencyDetailPage() {
         type: depScore.dependency.type,
         score: depScore.score,
         riskLevel: depScore.riskLevel,
+        scoreEntry: depScore,
       });
       setLoading(false);
     } catch (err) {
@@ -85,8 +141,8 @@ export default function DependencyDetailPage() {
   if (loading) {
     return (
       <section className="dependency-detail-page">
-        <h1>Détails de la Dépendance</h1>
-        <p>Chargement des informations...</p>
+        <h1>Dependency Details</h1>
+        <p>Loading information...</p>
       </section>
     );
   }
@@ -94,14 +150,14 @@ export default function DependencyDetailPage() {
   if (error) {
     return (
       <section className="dependency-detail-page">
-        <h1>Détails de la Dépendance</h1>
+        <h1>Dependency Details</h1>
         <p className="error-text">{error}</p>
         <div className="detail-actions">
           <button className="button" onClick={() => void load()}>
-            Réessayer
+            Retry
           </button>
           <Link className="button button-secondary" to={`/results/${resultToken}`}>
-            Retour aux résultats
+            Back to results
           </Link>
         </div>
       </section>
@@ -111,8 +167,8 @@ export default function DependencyDetailPage() {
   if (!dependency) {
     return (
       <section className="dependency-detail-page">
-        <h1>Détails de la Dépendance</h1>
-        <p>Aucune dépendance trouvée.</p>
+        <h1>Dependency Details</h1>
+        <p>No dependency found.</p>
       </section>
     );
   }
@@ -123,38 +179,38 @@ export default function DependencyDetailPage() {
         <div className="header-content">
           <h1>{dependency.name}</h1>
           <span className={`type-badge type-${dependency.type.toLowerCase()}`}>
-            {dependency.type === "DEPENDENCY" ? "Dépendance" : "Dev Dépendance"}
+            {dependency.type === "DEPENDENCY" ? "Dependency" : "Dev Dependency"}
           </span>
         </div>
         <button 
           className="button button-back"
           onClick={() => navigate(`/results/${resultToken}`)}
         >
-          ← Retour
+          ← Back
         </button>
       </header>
 
       <article className="info-section">
-        <h2>Informations Générales</h2>
+        <h2>General Information</h2>
         <div className="info-grid">
           <div className="info-item">
-            <span className="info-label">Version Requise</span>
+            <span className="info-label">Required Version</span>
             <span className="info-value">{dependency.versionRequirement}</span>
           </div>
           <div className="info-item">
             <span className="info-label">Type</span>
             <span className="info-value">
-              {dependency.type === "DEPENDENCY" ? "Dépendance" : "Dev Dépendance"}
+              {dependency.type === "DEPENDENCY" ? "Dependency" : "Dev Dependency"}
             </span>
           </div>
         </div>
       </article>
 
       <article className="metrics-section">
-        <h2>Score et Niveau de Risque</h2>
+        <h2>Score and Risk Level</h2>
         <div className="metrics-grid">
           <div className="metric-card score-card">
-            <h3>Score de Dépendance</h3>
+            <h3>Dependency Score</h3>
             <div className="score-display">
               <span className="score-value">{dependency.score}</span>
               <span className="score-max">/100</span>
@@ -172,19 +228,19 @@ export default function DependencyDetailPage() {
           </div>
 
           <div className="metric-card risk-card">
-            <h3>Niveau de Risque</h3>
+            <h3>Risk Level</h3>
             <p className={`risk-level ${riskClassName(dependency.riskLevel)}`}>
               {riskLabel(dependency.riskLevel)}
             </p>
             <div className="risk-description">
               {dependency.riskLevel === "LOW" && (
-                <p>La dépendance présente un faible risque pour votre projet.</p>
+                <p>This dependency presents a low risk for your project.</p>
               )}
               {dependency.riskLevel === "MEDIUM" && (
-                <p>La dépendance présente un risque moyen. Vérifiez les mises à jour disponibles.</p>
+                <p>This dependency presents a medium risk. Check for available updates.</p>
               )}
               {dependency.riskLevel === "HIGH" && (
-                <p>La dépendance présente un risque élevé. Envisagez une mise à jour ou un remplacement.</p>
+                <p>This dependency presents a high risk. Consider updating or replacing it.</p>
               )}
             </div>
           </div>
@@ -192,11 +248,47 @@ export default function DependencyDetailPage() {
       </article>
 
       <article className="github-section">
-        <h2>Métriques GitHub</h2>
+        <h2>GitHub Metrics</h2>
         <div className="github-metrics">
           <div className="metric-placeholder">
-            <p>Les métriques GitHub seront bientôt disponibles</p>
+            <p>Repository</p>
+            <div className="github-metric-value">
+              {getRepositoryUrl(dependency.scoreEntry) ? (
+                <a href={getRepositoryUrl(dependency.scoreEntry) ?? "#"} target="_blank" rel="noreferrer">
+                  {getRepositoryUrl(dependency.scoreEntry)}
+                </a>
+              ) : (
+                "-"
+              )}
+            </div>
+          </div>
 
+          <div className="metric-placeholder">
+            <p>Popularity</p>
+            <div className="github-metric-value">Stars: {formatMetric(getGithubMetrics(dependency.scoreEntry).stars)}</div>
+            <div className="github-metric-value">Watchers: {formatMetric(getGithubMetrics(dependency.scoreEntry).watchers)}</div>
+          </div>
+
+          <div className="metric-placeholder">
+            <p>Maintenance</p>
+            <div className="github-metric-value">Forks: {formatMetric(getGithubMetrics(dependency.scoreEntry).forks)}</div>
+            <div className="github-metric-value">Open issues: {formatMetric(getGithubMetrics(dependency.scoreEntry).openIssues)}</div>
+            <div className="github-metric-value">Closed issues: {formatMetric(getGithubMetrics(dependency.scoreEntry).closedIssues)}</div>
+          </div>
+
+          <div className="metric-placeholder">
+            <p>Warnings</p>
+            <div className="github-metric-value">
+              {getGithubMetrics(dependency.scoreEntry).warnings.length > 0 ? (
+                <ul className="warning-list">
+                  {getGithubMetrics(dependency.scoreEntry).warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              ) : (
+                "No warnings reported"
+              )}
+            </div>
           </div>
         </div>
       </article>
