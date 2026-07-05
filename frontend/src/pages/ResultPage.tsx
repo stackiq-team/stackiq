@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchAnalysisByResultToken } from "../service/ApiService";
 import type { AnalysisLookupResponse } from "../service/ApiService";
@@ -73,6 +73,25 @@ function getRepositoryUrl(score?: ScoreEntry) {
   return null;
 }
 
+function getGithubMetrics(score?: ScoreEntry) {
+  const metrics = getRecord(score?.githubMetrics);
+  const issueMetrics = getRecord(score?.issueMetrics);
+
+  return {
+    stars: typeof metrics?.stars === "number" ? metrics.stars : null,
+    watchers: typeof metrics?.watchers === "number" ? metrics.watchers : null,
+    forks: typeof metrics?.forks === "number" ? metrics.forks : null,
+    openIssues:
+      typeof issueMetrics?.openIssues === "number" ? issueMetrics.openIssues : null,
+    closedIssues:
+      typeof issueMetrics?.closedIssues === "number" ? issueMetrics.closedIssues : null,
+  };
+}
+
+function formatMetric(value: number | null | undefined) {
+  return typeof value === "number" ? value.toLocaleString() : "-";
+}
+
 function dependencyStatusLabel(analysisStatus: AnalysisStatus, score?: ScoreEntry) {
   if (score) return "Completed";
   if (analysisStatus === "FAILED") return "Not Scored";
@@ -109,6 +128,8 @@ function DependencyTable({
 }: {
   analysis: AnalysisLookupResponse["analysis"];
 }) {
+  const [expandedDependencies, setExpandedDependencies] = useState<Record<string, boolean>>({});
+
   const scoresByDependencyId = new Map(
     analysis.result?.dependencyScores.map((score) => [
       score.dependency.id,
@@ -125,6 +146,13 @@ function DependencyTable({
         type: score.dependency.type,
       })) ?? [];
 
+  const toggleDependency = useCallback((dependencyId: string) => {
+    setExpandedDependencies((current) => ({
+      ...current,
+      [dependencyId]: !current[dependencyId],
+    }));
+  }, []);
+
   return (
     <div className="table-wrapper">
       <table>
@@ -137,35 +165,105 @@ function DependencyTable({
             <th>Status</th>
             <th>Score</th>
             <th>Risk</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {dependencies.map((dependency) => {
             const score = scoresByDependencyId.get(dependency.id);
             const repositoryUrl = getRepositoryUrl(score);
+            const githubMetrics = getGithubMetrics(score);
+            const isExpanded = Boolean(expandedDependencies[dependency.id]);
+            const viewMoreLink = `/results/${analysis.resultToken}/dependency/${encodeURIComponent(dependency.name)}`;
 
             return (
-              <tr key={`${dependency.id}-${dependency.type}`}>
-                <td>{dependency.name}</td>
-                <td className="repo-url-cell">
-                  {repositoryUrl ? (
-                    <a href={repositoryUrl} target="_blank" rel="noreferrer">
-                      {repositoryUrl}
-                    </a>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td>{dependency.versionRequirement}</td>
-                <td>{dependency.type}</td>
-                <td>
-                  <DependencyStatusBadge analysisStatus={analysis.status} score={score} />
-                </td>
-                <td>{score?.score ?? "-"}</td>
-                <td className={score ? riskClassName(score.riskLevel) : undefined}>
-                  {score?.riskLevel ?? "-"}
-                </td>
-              </tr>
+              <Fragment key={`${dependency.id}-${dependency.type}`}>
+                <tr className="dependency-row">
+                  <td className="dependency-name-cell">{dependency.name}</td>
+                  <td className="repo-url-cell">
+                    {repositoryUrl ? (
+                      <a href={repositoryUrl} target="_blank" rel="noreferrer">
+                        {repositoryUrl}
+                      </a>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td>{dependency.versionRequirement}</td>
+                  <td>{dependency.type}</td>
+                  <td>
+                    <DependencyStatusBadge analysisStatus={analysis.status} score={score} />
+                  </td>
+                  <td>{score?.score ?? "-"}</td>
+                  <td className={score ? riskClassName(score.riskLevel) : undefined}>
+                    {score?.riskLevel ?? "-"}
+                  </td>
+                  <td className="dependency-toggle-cell dependency-toggle-cell-right">
+                    <button
+                      type="button"
+                      className={`dependency-toggle ${isExpanded ? "is-expanded" : ""}`}
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? "Collapse" : "Expand"} ${dependency.name}`}
+                      onClick={() => toggleDependency(dependency.id)}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                        className="dependency-toggle-icon"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="m19.5 8.25-7.5 7.5-7.5-7.5"
+                        />
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+                {isExpanded && (
+                  <tr className="dependency-expanded-row">
+                    <td colSpan={8}>
+                      <div className="dependency-expanded-panel">
+                        <div className="dependency-expanded-grid">
+                          <article className="dependency-mini-card">
+                            <h3>Useful Info</h3>
+                            <ul>
+                              <li><strong>Version:</strong> {dependency.versionRequirement}</li>
+                              <li><strong>Type:</strong> {dependency.type}</li>
+                              <li><strong>Status:</strong> <DependencyStatusBadge analysisStatus={analysis.status} score={score} /></li>
+                              <li><strong>Score:</strong> {score?.score ?? "-"}</li>
+                              <li><strong>Risk:</strong> {score?.riskLevel ?? "-"}</li>
+                            </ul>
+                          </article>
+
+                          <article className="dependency-mini-card">
+                            <h3>GitHub Metrics</h3>
+                            <ul>
+                              <li><strong>Stars:</strong> {formatMetric(githubMetrics.stars)}</li>
+                              <li><strong>Watchers:</strong> {formatMetric(githubMetrics.watchers)}</li>
+                              <li><strong>Forks:</strong> {formatMetric(githubMetrics.forks)}</li>
+                              <li><strong>Open issues:</strong> {formatMetric(githubMetrics.openIssues)}</li>
+                              <li><strong>Closed issues:</strong> {formatMetric(githubMetrics.closedIssues)}</li>
+                            </ul>
+                          </article>
+
+                          <article className="dependency-mini-card dependency-mini-card-action">
+                            <h3>Next Step</h3>
+                            <p>Open the dependency detail page for a fuller breakdown and all available metrics.</p>
+                            <Link className="button button-secondary dependency-view-more" to={viewMoreLink}>
+                              View more...
+                            </Link>
+                          </article>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             );
           })}
         </tbody>
@@ -318,17 +416,17 @@ export default function ResultPage() {
         </>
       ) : (
         <>
-          <article className="summary-section">
-            <h2>{analysis.status === "FAILED" ? "Analysis Failed" : "Analysis In Progress"}</h2>
-            <p>
-              {analysis.result
-                ? analysis.result.summary
-                : "The analysis exists but results are not ready yet. Press refresh in a few moments."}
-            </p>
-          </article>
+          <div className="analysis-status-row">
+            <article className="summary-section analysis-status-info">
+              <h2>{analysis.status === "FAILED" ? "Analysis Failed" : "Analysis In Progress"}</h2>
+              <p>
+                {analysis.result
+                  ? analysis.result.summary
+                  : "The analysis exists but results are not ready yet. Press refresh in a few moments."}
+              </p>
+            </article>
 
-          <div className="summary-grid">
-            <article className="summary-card">
+            <article className="summary-card analysis-status-time">
               <h2>Elapsed Time</h2>
               <p>{analysisDuration}</p>
             </article>
