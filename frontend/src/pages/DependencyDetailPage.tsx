@@ -196,22 +196,11 @@ export default function DependencyDetailPage() {
         <div className="github-metrics">
           <div className="metric-placeholder">
             <p>Les métriques GitHub seront bientôt disponibles</p>
-            <ul>
-              <li>⭐ Nombre d'étoiles</li>
-              <li>👁️ Watchers</li>
-              <li>🐛 Problèmes ouverts</li>
-              <li>📅 Dernière mise à jour</li>
-              <li>📄 Licence</li>
-            </ul>
+
           </div>
         </div>
       </article>
 
-      <div className="detail-actions">
-        <Link className="button" to={`/results/${resultToken}`}>
-          Voir tous les résultats
-        </Link>
-      </div>
     </section>
   );
 }

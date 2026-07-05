@@ -9,7 +9,15 @@ export interface AnalysisResult {
   dependencyScores: Array<{
     score: number;
     riskLevel: "LOW" | "MEDIUM" | "HIGH";
+    popularityScore?: number | null;
+    maintenanceScore?: number | null;
+    resolutionQualityScore?: number | null;
+    normalizedInputs?: Record<string, number | null> | null;
+    githubMetrics?: unknown;
+    issueMetrics?: unknown;
+    warnings?: string[] | null;
     dependency: {
+      id: string;
       name: string;
       versionRequirement: string;
       type: "DEPENDENCY" | "DEV_DEPENDENCY";
@@ -29,10 +37,12 @@ export interface AnalysisLookupResponse {
   message: string;
   analysis: {
     id: string;
-    email: string;
+    email: string | null;
     status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
     resultToken: string;
     errorMessage: string | null;
+    createdAt: string;
+    updatedAt: string;
     dependencies: Array<{
       id: string;
       name: string;

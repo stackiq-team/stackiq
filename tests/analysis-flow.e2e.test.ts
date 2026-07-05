@@ -5,7 +5,7 @@ const { prismaMock, queueState } = vi.hoisted(() => {
   const state = {
     analysis: null as null | {
       id: string;
-      email: string;
+      email: string | null;
       status: string;
       resultToken: string;
       errorMessage: string | null;
@@ -29,6 +29,13 @@ const { prismaMock, queueState } = vi.hoisted(() => {
       dependencyId: string;
       score: number;
       riskLevel: string;
+      popularityScore?: number | null;
+      maintenanceScore?: number | null;
+      resolutionQualityScore?: number | null;
+      normalizedInputs?: unknown;
+      githubMetrics?: unknown;
+      issueMetrics?: unknown;
+      warnings?: unknown;
     }>,
     queuedJob: null as null | { analysisId: string },
   };
@@ -79,11 +86,16 @@ const { prismaMock, queueState } = vi.hoisted(() => {
     },
     analysisResult: {
       upsert: vi.fn(async (args) => {
-        state.result = {
-          id: "result-1",
-          analysisId: args.where.analysisId,
-          ...args.create,
-        };
+        state.result = state.result
+          ? {
+              ...state.result,
+              ...args.update,
+            }
+          : {
+              id: "result-1",
+              analysisId: args.where.analysisId,
+              ...args.create,
+            };
 
         return { id: state.result.id };
       }),
@@ -95,6 +107,28 @@ const { prismaMock, queueState } = vi.hoisted(() => {
       createMany: vi.fn(async (args) => {
         state.dependencyScores = args.data;
         return { count: args.data.length };
+      }),
+      upsert: vi.fn(async (args) => {
+        const index = state.dependencyScores.findIndex(
+          (score) =>
+            score.analysisResultId === args.where.analysisResultId_dependencyId.analysisResultId &&
+            score.dependencyId === args.where.analysisResultId_dependencyId.dependencyId
+        );
+
+        const nextScore = index >= 0
+          ? {
+              ...state.dependencyScores[index],
+              ...args.update,
+            }
+          : args.create;
+
+        if (index >= 0) {
+          state.dependencyScores[index] = nextScore;
+        } else {
+          state.dependencyScores.push(nextScore);
+        }
+
+        return nextScore;
       }),
     },
   };
@@ -123,6 +157,10 @@ vi.mock("../backend/src/queue/analysisQueue", () => ({
   }),
 }));
 
+vi.mock("../worker/src/adapters/issuesMining.adapter.js", () => ({
+  runIssuesMining: vi.fn(),
+}));
+
 import { app } from "../backend/src/app";
 import { processAnalysisJob } from "../worker/src/analysisProcessor.js";
 
@@ -144,10 +182,10 @@ describe("analysis flow", () => {
       const packageJson = {
         name: "frontend",
         dependencies: {
-          react: "^19.2.6",
+          "react-bootstrap-country-select": "^19.2.6",
         },
         devDependencies: {
-          vitest: "^4.1.7",
+          "radix-select-vitest": "^4.1.7",
         },
       };
 
@@ -185,6 +223,66 @@ describe("analysis flow", () => {
         },
         {
           prisma: prismaMock,
+          runGitHubMiner: vi.fn(async (dependency) => ({
+            dependencyId: dependency.dependencyId,
+            packageName: dependency.fullPackageName,
+            repository: {
+              owner: "facebook",
+              name: "react",
+              fullName: "facebook/react",
+              description: "React",
+              url: "https://github.com/facebook/react",
+              createdAt: "2015-01-01",
+            },
+            stars: 100000,
+            forks: 20000,
+            watchers: 5000,
+            contributors: 100,
+            createdAt: "2015-01-01",
+            projectAgeDays: 365 * 5,
+            pullRequests: 20000,
+            issues: 100,
+            license: "MIT",
+            languages: ["JavaScript"],
+            primaryLanguage: "JavaScript",
+            topics: ["react"],
+            created_at: "2015-01-01",
+            npm: {
+              weeklyDownloads: 10000000,
+              packageAgeDays: 365 * 5,
+              latestPublishAgeDays: 0,
+              versionCount: 100,
+              dependencyCount: 0,
+              devDependencyCount: 0,
+              hasLicense: true,
+              hasRepository: true,
+              hasReadme: true,
+            },
+          })),
+          runIssuesMining: vi.fn(async () => ({
+            status: "SUCCESS",
+            metrics: {
+              totalIssuesAnalyzed: 10,
+              openIssues: 0,
+              closedIssues: 10,
+              closedIssuesAnalyzed: 10,
+              recentActivityCount: 4,
+              averageResolutionTimeHours: 7 * 24,
+              averageResolutionTimeDays: 7,
+              averageFirstResponseTimeDays: 1,
+              firstResponseTimeHours: 24,
+              closureRate: 1,
+              noResponseRate: 0,
+              closeRateByPR: 1,
+              closedByPrRate: 1,
+              closedByPRRate: 1,
+              codeResolutionRate: 1,
+              postCloseActivityRate: 0,
+              openToAssignedTimeHours: 24,
+              mergedPRRate: 1,
+              uncodedCloseRate: 0,
+            },
+          })),
           logger: {
             log: vi.fn(),
             error: vi.fn(),
@@ -195,23 +293,29 @@ describe("analysis flow", () => {
       expect(queueState.analysis?.status).toBe("COMPLETED");
       expect(queueState.result).toMatchObject({
         analysisId: "analysis-1",
-        globalScore: 90,
+        globalScore: 100,
         riskLevel: "LOW",
-        summary: "Scored 2 dependencies.",
+        summary: "Scored 2 dependencies (0 high risk).",
       });
       expect(queueState.dependencyScores).toEqual([
-        {
+        expect.objectContaining({
           analysisResultId: "result-1",
           dependencyId: "dependency-1",
-          score: 92,
+          score: 100,
           riskLevel: "LOW",
-        },
-        {
+          popularityScore: 100,
+          maintenanceScore: 100,
+          resolutionQualityScore: 100,
+        }),
+        expect.objectContaining({
           analysisResultId: "result-1",
           dependencyId: "dependency-2",
-          score: 87,
+          score: 100,
           riskLevel: "LOW",
-        },
+          popularityScore: 100,
+          maintenanceScore: 100,
+          resolutionQualityScore: 100,
+        }),
       ]);
     } finally {
       await new Promise<void>((resolve, reject) => {

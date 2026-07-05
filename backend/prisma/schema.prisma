@@ -38,7 +38,7 @@ model Dependency {
 
 model Analysis {
   id           String         @id @default(uuid()) @db.Uuid
-  email        String
+  email        String?
   status       AnalysisStatus @default(PENDING)
   resultToken  String         @unique @default(uuid()) @map("result_token") @db.Uuid
   errorMessage String?        @map("error_message")
@@ -72,6 +72,13 @@ model DependencyScore {
   dependencyId     String   @map("dependency_id") @db.Uuid
   score            Int
   riskLevel        String   @map("risk_level")
+  popularityScore  Int?     @map("popularity_score")
+  maintenanceScore Int?     @map("maintenance_score")
+  resolutionQualityScore Int? @map("resolution_quality_score")
+  normalizedInputs Json?    @map("normalized_inputs")
+  githubMetrics    Json?    @map("github_metrics")
+  issueMetrics     Json?    @map("issue_metrics")
+  warnings         Json?
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -81,4 +88,40 @@ model DependencyScore {
   @@unique([analysisResultId, dependencyId])
   @@index([dependencyId])
   @@map("dependency_scores")
+}
+
+model DependencyAnalysisCache {
+  id                     String   @id @default(uuid()) @db.Uuid
+  cacheKey               String   @unique @map("cache_key")
+  ecosystem              String
+  packageManager         String   @map("package_manager")
+  dependencyName         String   @map("dependency_name")
+  versionRequirement     String?  @map("version_requirement")
+  versionBucket          String?  @map("version_bucket")
+  repositoryOwner        String?  @map("repository_owner")
+  repositoryName         String?  @map("repository_name")
+  repositoryFullName     String?  @map("repository_full_name")
+  repositoryUrl          String?  @map("repository_url")
+  githubMinerRaw         Json?    @map("github_miner_raw")
+  issuesMiningRaw        Json?    @map("issues_mining_raw")
+  issueMetrics           Json?    @map("issue_metrics")
+  normalizedMetrics      Json?    @map("normalized_metrics")
+  score                  Int?
+  riskLevel              String?  @map("risk_level")
+  popularityScore        Int?     @map("popularity_score")
+  maintenanceScore       Int?     @map("maintenance_score")
+  resolutionQualityScore Int?     @map("resolution_quality_score")
+  warnings               Json?
+  status                 String   @default("SUCCESS")
+  issuesConfigHash       String   @map("issues_config_hash")
+  cacheVersion           String   @map("cache_version")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+  expiresAt              DateTime @map("expires_at")
+  lastAccessedAt         DateTime @default(now()) @map("last_accessed_at")
+
+  @@index([dependencyName])
+  @@index([repositoryFullName])
+  @@index([expiresAt])
+  @@map("dependency_analysis_cache")
 }
