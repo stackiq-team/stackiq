@@ -5,11 +5,17 @@ vi.mock("../adapters/issuesMining.adapter.js", () => ({
   runIssuesMining: vi.fn(),
 }));
 
+vi.mock("../adapters/email.adapter.js", () => ({
+  sendResultEmail: vi.fn().mockResolvedValue(true),
+}));
+
 import { processAnalysisJob } from "../analysisProcessor.js";
+import { sendResultEmail } from "../adapters/email.adapter.js";
 
 function createPrismaMock(
-  analysis: { id: string; dependencies: any[] } | null = {
+  analysis: { id: string; dependencies: any[], email?: string } | null = {
     id: "analysis-1",
+    email:"test@example.com",
     dependencies: [],
   }
 ) {
@@ -34,6 +40,7 @@ const job = {
   attemptsMade: 0,
   data: {
     analysisId: "analysis-1",
+    email: "test@example.com",
   },
 };
 
@@ -135,6 +142,7 @@ describe("processAnalysisJob", () => {
       },
     });
     expect(runAnalysis).toHaveBeenCalledWith({
+      email:"test@example.com",
       analysisId: "analysis-1",
       dependencies: [],
     });
@@ -173,6 +181,32 @@ describe("processAnalysisJob", () => {
     });
     expect(prisma.dependencyScore.createMany).not.toHaveBeenCalled();
     expect(prisma.dependencyScore.upsert).not.toHaveBeenCalled();
+  });
+
+  it("sends the analysis result email when an email address is provided", async () => {
+    vi.clearAllMocks();
+
+    const prisma = createPrismaMock();
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 88,
+      riskLevel: "LOW",
+      summary: "Analysis completed.",
+    });
+
+    await processAnalysisJob(job, {
+      prisma,
+      runAnalysis,
+      logger,
+    });
+
+    expect(sendResultEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        globalScore: 88,
+        riskLevel: "LOW",
+        summary: "Analysis completed.",
+      }),
+      "test@example.com"
+    );
   });
 
   it("persists dependency scores when the analysis returns them", async () => {
@@ -350,6 +384,7 @@ describe("processAnalysisJob", () => {
     expect(runIssuesMining).not.toHaveBeenCalled();
     expect(cacheManager.save).not.toHaveBeenCalled();
     expect(runAnalysis).toHaveBeenCalledWith({
+      email:"test@example.com",
       analysisId: "analysis-1",
       dependencies: [
         expect.objectContaining({

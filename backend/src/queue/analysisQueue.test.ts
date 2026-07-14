@@ -40,18 +40,20 @@ describe("analysisQueue", () => {
   });
 
   it("creates analysis jobs with the analysis id as job id", async () => {
-    queueAddMock.mockResolvedValue({ id: "analysis-1" });
+    queueAddMock.mockResolvedValue({ id: "analysis-1", email: "test@test.com" });
 
     const { enqueueAnalysisJob } = await import("./analysisQueue");
 
     await enqueueAnalysisJob({
       analysisId: "analysis-1",
+      email: "test@test.com",
     });
 
     expect(queueAddMock).toHaveBeenCalledWith(
       "run-analysis",
       {
         analysisId: "analysis-1",
+        email: "test@test.com",
       },
       {
         jobId: "analysis-1",

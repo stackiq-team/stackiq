@@ -138,6 +138,7 @@ router.post(
 
       const job = await enqueueAnalysisJob({
         analysisId: analysis.id,
+        email: analysis.email || undefined,
       });
 
       console.log(
