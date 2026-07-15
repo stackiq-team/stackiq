@@ -1,5 +1,3 @@
-// services/analyseService.ts
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000"
 
 export interface AnalysisResult {
@@ -15,6 +13,7 @@ export interface AnalysisResult {
     normalizedInputs?: Record<string, number | null> | null;
     githubMetrics?: unknown;
     issueMetrics?: unknown;
+    issueData?: unknown;
     warnings?: string[] | null;
     dependency: {
       id: string;
