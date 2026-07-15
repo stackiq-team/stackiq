@@ -20,9 +20,32 @@ export interface IssuesMiningMetrics {
   uncodedCloseRate: number | null;        // ratio of issues closed with no code reference
 }
 
+export interface IssueSummary {
+  number: number;
+  publishedAt: string;
+  closedAt: string | null;
+  closed: boolean;
+  assigneesCount: number;
+  firstAssignedAt: string | null;
+  closer: {
+    stateReason: string | null;
+    type: string | null;
+    merged: boolean | null;
+    closedByBot: boolean | null;
+    closedByLogin: string | null;
+    wasReclassified: boolean;
+  };
+  hasConnectedEvent: boolean;
+  hasPostCloseActivity: boolean;
+  tooManyTimelineItems: boolean;
+  timelineTotalCount: number;
+  timelineCapturedCount: number;
+}
+
 export interface IssuesMiningResult {
   status: 'SUCCESS' | 'PARTIAL' | 'FAILED';
   metrics: IssuesMiningMetrics;
   rawData?: unknown;
+  issueData?: IssueSummary[];
   error?: string;
 }

@@ -1,8 +1,10 @@
 // queries.js
+import dotenv from 'dotenv';
+dotenv.config();
 
-const nbItemsPerQuery = Number(process.env.ISSUES_MINING_TIMELINE_ITEMS ?? 15);
+const nbItemsPerQuery = Number(process.env.ISSUES_MINING_TIMELINE_ITEMS ?? 100);
 
-function projectQuery(_owner, _name, _cursor, since) {
+function projectQuery(_owner, _name, _cursor, since, state) {
   let cursor = _cursor !== "" ? `, after:"${_cursor}"` : "";
   if (since == null) since = "2025-01-01";
   let sinceDate = since + "T00:00:00.000+0000";
@@ -11,7 +13,7 @@ function projectQuery(_owner, _name, _cursor, since) {
     {
       repository(owner: "${_owner}", name: "${_name}") {
         nameWithOwner
-        issues(first: 1${cursor}, filterBy: {since:"${sinceDate}"}) {
+        issues(first: 1${cursor}, filterBy: {since:"${sinceDate}"}, states: [${state}]) {
           totalCount
           edges {
             cursor
@@ -588,15 +590,17 @@ function projectQuery(_owner, _name, _cursor, since) {
 `;
 }
 
-function issueItemQuery(_owner, _name, _cursor, _ccursor) {
+function issueItemQuery(_owner, _name, _cursor, _ccursor, since, state) {
   let cursor = _cursor !== "" ? `, after:"${_cursor}"` : "";
   let ccursor = _ccursor !== "" ? `, after:"${_ccursor}"` : "";
+  if (since == null) since = "2025-01-01";
+  let sinceDate = since + "T00:00:00.000+0000";
 
   return `
     {
         repository(owner: "${_owner}", name: "${_name}") {
           nameWithOwner
-          issues(first: 1${cursor}) {
+          issues(first: 1${cursor}, filterBy: {since:"${sinceDate}"}, states: [${state}]) {
             totalCount
             pageInfo {
                 endCursor

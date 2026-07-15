@@ -17,7 +17,7 @@ import {
 } from "./dependencyScore.js";
 import { fetchGitHubMinerData } from "./adapters/githubMinerAdapter.js";
 import type { GitHubMinerInput, GitHubMinerOutput } from "./types/githubMinerType.js";
-import type { IssuesMiningMetrics, IssuesMiningResult } from "./types/issuesMining.types.js";
+import type { IssuesMiningMetrics, IssuesMiningResult, IssueSummary } from "./types/issuesMining.types.js";
 import { DependencyAnalysisCacheManager } from "./cache/dependencyAnalysisCache.js";
 
 type AnalysisResultData = {
@@ -51,6 +51,7 @@ type DependencyScoreCreateData = {
   normalizedInputs?: any;
   githubMetrics?: any;
   issueMetrics?: any;
+  issueData?: any;
   warnings?: any;
 };
 
@@ -323,6 +324,7 @@ async function enrichDependencies(args: {
     const warnings: string[] = [];
     let gitHubMetrics: GitHubMinerOutput | null = null;
     let issueMetrics: IssuesMiningMetrics | null = null;
+    let issueData: IssueSummary[] | null = null;
     let issueResultForCache: IssuesMiningResult | null = null;
     let releaseCacheLock: (() => Promise<void>) | null = null;
 
@@ -341,6 +343,7 @@ async function enrichDependencies(args: {
           dependencyId: dependency.id,
         };
         issueMetrics = cached.issueResult?.metrics ?? null;
+        issueData = cached.issueResult?.issueData ?? null;
         issueResultForCache = cached.issueResult;
         warnings.push(...cached.warnings);
 
@@ -348,6 +351,7 @@ async function enrichDependencies(args: {
           dependency,
           gitHubMetrics,
           issueMetrics,
+          issueData,
           warnings,
         };
         enrichedDependencies.push(enrichedDependency);
@@ -376,6 +380,7 @@ async function enrichDependencies(args: {
             dependencyId: dependency.id,
           };
           issueMetrics = cachedAfterLock.issueResult?.metrics ?? null;
+          issueData = cachedAfterLock.issueResult?.issueData ?? null;
           issueResultForCache = cachedAfterLock.issueResult;
           warnings.push(...cachedAfterLock.warnings);
 
@@ -383,6 +388,7 @@ async function enrichDependencies(args: {
             dependency,
             gitHubMetrics,
             issueMetrics,
+            issueData,
             warnings,
           };
           enrichedDependencies.push(enrichedDependency);
@@ -418,6 +424,7 @@ async function enrichDependencies(args: {
           dependency,
           gitHubMetrics,
           issueMetrics,
+          issueData,
           warnings,
         };
         enrichedDependencies.push(enrichedDependency);
@@ -442,6 +449,7 @@ async function enrichDependencies(args: {
           dependency,
           gitHubMetrics,
           issueMetrics,
+          issueData,
           warnings,
         };
         enrichedDependencies.push(enrichedDependency);
@@ -482,6 +490,7 @@ async function enrichDependencies(args: {
       }
       issueResultForCache = issueResult;
       issueMetrics = issueResult.metrics;
+      issueData = issueResult.issueData ?? null;
 
       args.logger.log(
         `[worker] issuesMining finished: analysisId=${args.analysisId}, dependency=${dependency.name}, status=${issueResult.status}, totalIssues=${issueMetrics.totalIssuesAnalyzed}`
@@ -502,6 +511,7 @@ async function enrichDependencies(args: {
       dependency,
       gitHubMetrics,
       issueMetrics,
+      issueData,
       warnings,
     };
     enrichedDependencies.push(enrichedDependency);
@@ -649,6 +659,7 @@ async function upsertDependencyScore(args: {
       normalizedInputs: data.normalizedInputs,
       githubMetrics: data.githubMetrics,
       issueMetrics: data.issueMetrics,
+      issueData: data.issueData,
       warnings: data.warnings,
     },
   });
@@ -671,6 +682,7 @@ function buildDependencyScoreCreateData(args: {
     normalizedInputs: args.dependencyScore.breakdown?.normalizedInputs ?? null,
     githubMetrics: args.enrichedDependency.gitHubMetrics ?? null,
     issueMetrics: args.enrichedDependency.issueMetrics ?? null,
+    issueData: args.enrichedDependency.issueData ?? null,
     warnings: args.dependencyScore.warnings ?? [],
   };
 }
