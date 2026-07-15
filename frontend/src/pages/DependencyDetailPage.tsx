@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { fetchAnalysisByResultToken } from "../service/ApiService";
 import type { AnalysisLookupResponse } from "../service/ApiService";
 import "./DependencyDetailPage.css";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 type ScoreEntry = NonNullable<AnalysisLookupResponse["analysis"]["result"]>["dependencyScores"][number];
@@ -91,6 +92,197 @@ function getRepositoryUrl(score?: ScoreEntry) {
   return null;
 }
 
+function getIssueSummary(value: unknown) {
+  const record = getRecord(value);
+  if (!record) return null;
+
+  const closer = getRecord(record.closer) ?? {};
+
+  const rawStateReason = getStringValue(closer.stateReason);
+  const rawCloserType = getStringValue(closer.type);
+  const closedAt = getStringValue(record.closedAt);
+
+  const closerType = rawCloserType ?? (rawStateReason ? "Comment" : null);
+  const stateReason = rawStateReason ?? (closedAt ? "UNKNOWN" : null);
+
+  return {
+    number: typeof record.number === "number" ? record.number : null,
+    publishedAt: getStringValue(record.publishedAt),
+    closedAt,
+    closed: record.closed === true,
+    assigneesCount: typeof record.assigneesCount === "number" ? record.assigneesCount : null,
+    firstAssignedAt: getStringValue(record.firstAssignedAt),
+    stateReason,
+    closerType,
+    merged: closer.merged === true ? true : closer.merged === false ? false : null,
+    closedByBot: closer.closedByBot === true ? true : closer.closedByBot === false ? false : null,
+    closedByLogin: getStringValue(closer.closedByLogin),
+    wasReclassified: closer.wasReclassified === true,
+    hasConnectedEvent: record.hasConnectedEvent === true,
+    hasPostCloseActivity: record.hasPostCloseActivity === true,
+    tooManyTimelineItems: record.tooManyTimelineItems === true,
+    timelineTotalCount: typeof record.timelineTotalCount === "number" ? record.timelineTotalCount : null,
+    timelineCapturedCount: typeof record.timelineCapturedCount === "number" ? record.timelineCapturedCount : null,
+  };
+}
+
+type IssueSummary = NonNullable<ReturnType<typeof getIssueSummary>>;
+
+function getWeekStart(dateStr: string | null): string | null {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const day = date.getDay();
+  const diffToMonday = (day === 0 ? -6 : 1) - day;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  return monday.toISOString().split("T")[0];
+}
+
+function buildIssueActivityChartData(summaries: IssueSummary[]) {
+  const openedByWeek = new Map<string, number>();
+  const closedByWeek = new Map<string, number>();
+
+  summaries.forEach((s) => {
+    const openedWeek = getWeekStart(s.publishedAt);
+    if (openedWeek) openedByWeek.set(openedWeek, (openedByWeek.get(openedWeek) ?? 0) + 1);
+
+    const closedWeek = getWeekStart(s.closedAt);
+    if (closedWeek) closedByWeek.set(closedWeek, (closedByWeek.get(closedWeek) ?? 0) + 1);
+  });
+
+  const minDate = new Date();
+  minDate.setMonth(minDate.getMonth() - 12);
+  const startWeek = getWeekStart(minDate.toISOString());
+  const endWeek = getWeekStart(new Date().toISOString());
+
+  if (!startWeek || !endWeek) return [];
+
+  const weeks: string[] = [];
+  const cursor = new Date(startWeek);
+  const end = new Date(endWeek);
+
+  while (cursor <= end) {
+    weeks.push(cursor.toISOString().split("T")[0]);
+    cursor.setDate(cursor.getDate() + 7);
+  }
+
+  return weeks.map((week) => ({
+    week,
+    opened: openedByWeek.get(week) ?? 0,
+    closed: closedByWeek.get(week) ?? 0,
+  }));
+}
+
+const PIE_COLORS = ["#2563eb", "#f59e0b", "#22c55e", "#ef4444", "#a855f7"];
+
+function buildCloserBreakdownData(summaries: IssueSummary[]) {
+  const counts = new Map<string, number>();
+
+  summaries
+    .filter((s) => s.closed)
+    .forEach((s) => {
+      const category = s.closedByBot ? "Bot" : s.closerType ?? "Unknown";
+      counts.set(category, (counts.get(category) ?? 0) + 1);
+    });
+
+  return Array.from(counts.entries()).map(([name, value]) => ({ name, value }));
+}
+
+const ACTIVITY_BUCKETS: { label: string; min: number; max: number | null }[] = [
+  { label: "0-3", min: 0, max: 3 },
+  { label: "3-6", min: 3, max: 6 },
+  { label: "6-20", min: 6, max: 20 },
+  { label: "20-50", min: 20, max: 50 },
+  { label: "50-100", min: 50, max: 100 },
+  { label: "100+", min: 100, max: null },
+];
+
+function getActivityBucket(count: number | null): string | null {
+  if (count === null) return null;
+  const bucket = ACTIVITY_BUCKETS.find((b) => count >= b.min && (b.max === null || count < b.max));
+  return bucket ? bucket.label : null;
+}
+
+function buildActivityBucketData(summaries: IssueSummary[]) {
+  const counts = new Map<string, number>();
+  ACTIVITY_BUCKETS.forEach((b) => counts.set(b.label, 0));
+
+  summaries.forEach((s) => {
+    const bucket = getActivityBucket(s.timelineTotalCount);
+    if (bucket) counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+  });
+
+  return ACTIVITY_BUCKETS.map((b) => ({ bucket: b.label, count: counts.get(b.label) ?? 0 }));
+}
+
+function computeTimeToCloseStats(summaries: IssueSummary[]) {
+  const days = summaries
+    .filter((s) => s.closed && s.publishedAt && s.closedAt)
+    .map((s) => {
+      const opened = new Date(s.publishedAt as string).getTime();
+      const closed = new Date(s.closedAt as string).getTime();
+      return (closed - opened) / (1000 * 60 * 60 * 24);
+    })
+    .filter((d) => d >= 0);
+
+  if (days.length === 0) return { median: null, average: null };
+
+  const sorted = [...days].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  const average = sorted.reduce((sum, d) => sum + d, 0) / sorted.length;
+
+  return { median: Math.round(median * 10) / 10, average: Math.round(average * 10) / 10 };
+}
+
+function buildCloseReasonData(summaries: IssueSummary[]) {
+  const counts = new Map<string, number>();
+
+  summaries
+    .filter((s) => s.closed)
+    .forEach((s) => {
+      const reason = s.stateReason ?? "Unknown";
+      counts.set(reason, (counts.get(reason) ?? 0) + 1);
+    });
+
+  return Array.from(counts.entries()).map(([name, value]) => ({ name, value }));
+}
+
+function buildPostCloseActivityData(summaries: IssueSummary[]) {
+  const closedSummaries = summaries.filter((s) => s.closed);
+  const withActivity = closedSummaries.filter((s) => s.hasPostCloseActivity).length;
+  const withoutActivity = closedSummaries.length - withActivity;
+
+  return [
+    { name: "Had post-close activity", value: withActivity },
+    { name: "No post-close activity", value: withoutActivity },
+  ];
+}
+
+function computeTriageSpeedStats(summaries: IssueSummary[]) {
+  const days = summaries
+    .filter((s) => s.publishedAt && s.firstAssignedAt)
+    .map((s) => {
+      const opened = new Date(s.publishedAt as string).getTime();
+      const assigned = new Date(s.firstAssignedAt as string).getTime();
+      return (assigned - opened) / (1000 * 60 * 60 * 24);
+    })
+    .filter((d) => d >= 0);
+
+  if (days.length === 0) return { median: null, average: null };
+
+  const sorted = [...days].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  const average = sorted.reduce((sum, d) => sum + d, 0) / sorted.length;
+
+  return { median: Math.round(median * 10) / 10, average: Math.round(average * 10) / 10 };
+}
+
 export default function DependencyDetailPage() {
   const { resultToken, dependencyName } = useParams();
   const navigate = useNavigate();
@@ -98,6 +290,11 @@ export default function DependencyDetailPage() {
   const [error, setError] = useState("");
   const [dependency, setDependency] = useState<DependencyDetail | null>(null);
   const [riskInfoOpen, setRiskInfoOpen] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
+  const [selectedCloserCategory, setSelectedCloserCategory] = useState<string | null>(null);
+  const [selectedActivityBucket, setSelectedActivityBucket] = useState<string | null>(null);
+  const [selectedCloseReason, setSelectedCloseReason] = useState<string | null>(null);
+  const [selectedPostCloseActivity, setSelectedPostCloseActivity] = useState<string | null>(null);
 
   const load = async () => {
     if (!resultToken || !dependencyName) {
@@ -217,6 +414,38 @@ export default function DependencyDetailPage() {
   const warnings = Array.isArray(dependency.scoreEntry?.warnings)
     ? dependency.scoreEntry.warnings
     : [];
+  const issueData = Array.isArray(dependency.scoreEntry?.issueData)
+    ? (dependency.scoreEntry.issueData as unknown[])
+    : [];
+  const issueSummaries = issueData.map(getIssueSummary).filter((s): s is IssueSummary => s !== null);
+  const issueChartData = buildIssueActivityChartData(issueSummaries);
+  const closerBreakdownData = buildCloserBreakdownData(issueSummaries);
+  const activityBucketData = buildActivityBucketData(issueSummaries);
+  const closeReasonData = buildCloseReasonData(issueSummaries);
+  const postCloseActivityData = buildPostCloseActivityData(issueSummaries);
+  const filteredIssueSummaries = issueSummaries.filter((summary) => {
+    const weekMatch =
+      !selectedWeek ||
+      getWeekStart(summary.publishedAt) === selectedWeek ||
+      getWeekStart(summary.closedAt) === selectedWeek;
+
+    const category = summary.closed ? (summary.closedByBot ? "Bot" : summary.closerType ?? "Unknown") : null;
+    const categoryMatch = !selectedCloserCategory || category === selectedCloserCategory;
+
+    const bucketMatch =
+      !selectedActivityBucket || getActivityBucket(summary.timelineTotalCount) === selectedActivityBucket;
+
+    const reason = summary.closed ? summary.stateReason ?? "Unknown" : null;
+    const reasonMatch = !selectedCloseReason || reason === selectedCloseReason;
+    const postCloseMatch =
+      !selectedPostCloseActivity ||
+      (selectedPostCloseActivity === "Had post-close activity" ? summary.hasPostCloseActivity : summary.closed && !summary.hasPostCloseActivity);
+
+    return weekMatch && categoryMatch && bucketMatch && reasonMatch && postCloseMatch;
+  });
+
+  const timeToCloseStats = computeTimeToCloseStats(filteredIssueSummaries);
+  const triageSpeedStats = computeTriageSpeedStats(filteredIssueSummaries);
 
   return (
     <section className="dependency-detail-page">
@@ -470,6 +699,256 @@ export default function DependencyDetailPage() {
             ) : (
               <div className="github-metric-value">No warnings reported</div>
             )}
+          </div>
+
+        </div>
+      </article>
+
+      <article className="github-section">
+        <h2>
+          Issue Activity <a href="#issue-activity-note" className="footnote-link">*</a>
+          {selectedWeek && (
+                <button type="button" className="filter-clear-button" onClick={() => setSelectedWeek(null)}>
+                  Clear week filter ({selectedWeek})
+                </button>
+              )}
+              {selectedCloserCategory && (
+                <button type="button" className="filter-clear-button" onClick={() => setSelectedCloserCategory(null)}>
+                  Clear closer filter ({selectedCloserCategory})
+                </button>
+              )}
+              {selectedActivityBucket && (
+                <button type="button" className="filter-clear-button" onClick={() => setSelectedActivityBucket(null)}>
+                  Clear activity filter ({selectedActivityBucket})
+                </button>
+              )}
+              {selectedCloseReason && (
+                <button type="button" className="filter-clear-button" onClick={() => setSelectedCloseReason(null)}>
+                  Clear reason filter ({selectedCloseReason})
+                </button>
+              )}
+              {selectedPostCloseActivity && (
+                <button type="button" className="filter-clear-button" onClick={() => setSelectedPostCloseActivity(null)}>
+                  Clear activity filter ({selectedPostCloseActivity})
+                </button>
+              )}
+        </h2>
+        <div className="github-metrics">
+
+
+          <div className="metric-placeholder metric-placeholder-wide">
+            <div className="chart-grid">
+              <div className="metric-placeholder">
+                <p>Closed By</p>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={closerBreakdownData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label
+                        onClick={(data) => setSelectedCloserCategory(data.name as string)}
+                      >
+                        {closerBreakdownData.map((entry, index) => (
+                          <Cell key={entry.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="metric-placeholder">
+                <p>Timeline Activity Level</p>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={activityBucketData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="bucket" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Bar
+                        dataKey="count"
+                        fill="#2563eb"
+                        onClick={(data: any) => setSelectedActivityBucket(data.bucket as string)}
+                        cursor="pointer"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="metric-placeholder">
+                <p>Close Reasons</p>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={closeReasonData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label
+                        onClick={(data: any) => setSelectedCloseReason(data.name as string)}
+                        cursor="pointer"
+                      >
+                        {closeReasonData.map((entry, index) => (
+                          <Cell key={entry.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="metric-placeholder">
+                <p>Post-Close Activity</p>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={postCloseActivityData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label
+                        onClick={(data: any) => setSelectedPostCloseActivity(data.name as string)}
+                        cursor="pointer"
+                      >
+                        <Cell fill="#22c55e" />
+                        <Cell fill="#ef4444" />
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="metric-placeholder">
+                <p>Time to Close</p>
+                <div className="stat-card-body">
+                  <div className="stat-value-group">
+                    <div className="stat-value-label">Median</div>
+                    <div className="stat-value-number">
+                      {timeToCloseStats.median !== null ? `${timeToCloseStats.median} days` : "-"}
+                    </div>
+                  </div>
+                  <div className="stat-value-group">
+                    <div className="stat-value-label">Average</div>
+                    <div className="stat-value-number">
+                      {timeToCloseStats.average !== null ? `${timeToCloseStats.average} days` : "-"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="metric-placeholder">
+                <p>Triage Speed</p>
+                <div className="stat-card-body">
+                  <div className="stat-value-group">
+                    <div className="stat-value-label">Median</div>
+                    <div className="stat-value-number">
+                      {triageSpeedStats.median !== null ? `${triageSpeedStats.median} days` : "-"}
+                    </div>
+                  </div>
+                  <div className="stat-value-group">
+                    <div className="stat-value-label">Average</div>
+                    <div className="stat-value-number">
+                      {triageSpeedStats.average !== null ? `${triageSpeedStats.average} days` : "-"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="metric-placeholder metric-placeholder-wide">
+            <p>Issues Opened vs Closed (by week)</p>
+            <div style={{ width: "100%", height: 300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={issueChartData}
+                  onClick={(state) => {
+                    if (state && state.activeLabel) {
+                      setSelectedWeek(state.activeLabel as string);
+                    }
+                  }}
+                >
+                  
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="week" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="opened" name="Opened" stroke="#2563eb" />
+                  <Line type="monotone" dataKey="closed" name="Closed" stroke="#ef4444" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="metric-placeholder metric-placeholder-wide">
+            <p>Issue Details</p>
+            <div className="issues-table-wrapper">
+              <table className="issues-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Published</th>
+                    <th>Closed At</th>
+                    <th>Close Reason</th>
+                    <th>Closer Type</th>
+                    <th>Closed By Bot</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...filteredIssueSummaries]
+                    .sort((a, b) => {
+                      const aDate = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+                      const bDate = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+                      return bDate - aDate;
+                    })
+                    .map((summary, index) => (
+                      <tr key={summary.number ?? index}>
+                        <td>
+                          {summary.number && getRepositoryUrl(dependency.scoreEntry) ? (
+                            <a
+                              href={`${getRepositoryUrl(dependency.scoreEntry)}/issues/${summary.number}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {summary.number}
+                            </a>
+                          ) : (
+                            summary.number ?? "-"
+                          )}
+                        </td>
+                        <td>{formatDate(summary.publishedAt)}</td>
+                        <td>{formatDate(summary.closedAt)}</td>
+                        <td>{summary.stateReason ?? "-"}</td>
+                        <td>{summary.closerType ?? "-"}</td>
+                        <td>{formatBoolean(summary.closedByBot)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="metric-placeholder metric-placeholder-wide" id="issue-activity-note">
+            <p>* Issue activity analysis is capped at 30 open issues and 70 closed issues.</p>
           </div>
 
         </div>
