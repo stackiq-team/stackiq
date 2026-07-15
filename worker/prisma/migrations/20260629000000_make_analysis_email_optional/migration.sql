@@ -1,1 +1,0 @@
-ALTER TABLE "analyses" ALTER COLUMN "email" DROP NOT NULL;

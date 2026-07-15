@@ -14,7 +14,8 @@ export async function analyzeIssues(owner, repo, startDate) {
   const analyzed = analyze(summarized);
 
   return {
-    raw: summarized,
+    raw: null, // You can add raw data retrieval here but the sizes can be quite large, so it's omitted for now.
+    issueData: summarized,
     classifications: analyzed,
   };
 }

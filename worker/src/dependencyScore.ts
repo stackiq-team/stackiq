@@ -1,6 +1,6 @@
 import { DependencyType } from "@prisma/client";
 import type { GitHubMinerOutput } from "./types/githubMinerType.js";
-import type { IssuesMiningMetrics } from "./types/issuesMining.types.js";
+import type { IssuesMiningMetrics, IssueSummary } from "./types/issuesMining.types.js";
 
 const STAR_LOG_CAP = 100000;
 const FORK_LOG_CAP = 20000;
@@ -65,6 +65,7 @@ export type EnrichedDependencyInput = {
   dependency: DependencyInput;
   gitHubMetrics?: GitHubMinerOutput | null;
   issueMetrics?: IssuesMiningMetrics | null;
+  issueData?: IssueSummary[] | null;
   warnings?: string[];
 };
 

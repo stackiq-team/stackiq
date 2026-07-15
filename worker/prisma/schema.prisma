@@ -77,6 +77,7 @@ model DependencyScore {
   normalizedInputs Json?    @map("normalized_inputs")
   githubMetrics    Json?    @map("github_metrics")
   issueMetrics     Json?    @map("issue_metrics")
+  issueData        Json?    @map("issue_data")   // ADD THIS LINE
   warnings         Json?
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")

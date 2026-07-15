@@ -1,12 +1,13 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import { projectQuery, issueItemQuery } from './queries.js';
 import { graphql } from '@octokit/graphql';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
-dotenv.config();
 
 const ROTATION_THRESHOLD = 300;
-const DEFAULT_MAX_ISSUES = 10;
+const DEFAULT_MAX_OPEN_ISSUES = 30;
+const DEFAULT_MAX_CLOSED_ISSUES = 70;
 const DEFAULT_MAX_TIMELINE_PAGES = 1;
 
 let tokens = [];
@@ -58,6 +59,10 @@ function switchToken() {
   return false;
 }
 
+function trackingKey(repoFullName, state) {
+  return `${repoFullName}:${state}`;
+}
+
 async function checkAllTokens() {
   for (let i = 0; i < tokens.length; i++) {
     const { rateLimit } = await graphql(
@@ -67,7 +72,7 @@ async function checkAllTokens() {
     tokenRemaining[i] = rateLimit.remaining;
     tokenReset[i] = rateLimit.resetAt;
     const resetIn = Math.ceil((new Date(rateLimit.resetAt) - new Date()) / 1000 / 60);
-    // console.log(`[tokens] Token ${i}: ${rateLimit.remaining}/${rateLimit.limit} remaining — resets in ${resetIn} min`);
+    console.log(`[tokens] Token ${i}: ${rateLimit.remaining}/${rateLimit.limit} remaining — resets in ${resetIn} min`);
   }
 
   // pick the token with the most remaining
@@ -85,9 +90,13 @@ async function checkAllTokens() {
 
 let issues = {};
 
-function getMaxIssues() {
-  const configured = Number(process.env.ISSUES_MINING_MAX_ISSUES ?? DEFAULT_MAX_ISSUES);
-  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_ISSUES;
+function getMaxIssues(state) {
+  const envKey = state === 'OPEN'
+    ? 'ISSUES_MINING_MAX_OPEN_ISSUES'
+    : 'ISSUES_MINING_MAX_CLOSED_ISSUES';
+  const fallback = state === 'OPEN' ? DEFAULT_MAX_OPEN_ISSUES : DEFAULT_MAX_CLOSED_ISSUES;
+  const configured = Number(process.env[envKey] ?? fallback);
+  return Number.isFinite(configured) && configured > 0 ? configured : fallback;
 }
 
 function getMaxTimelinePages() {
@@ -95,7 +104,7 @@ function getMaxTimelinePages() {
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_TIMELINE_PAGES;
 }
 
-async function executeQuery0(projects, index, cursor, startDate) {
+async function executeQuery0(projects, index, cursor, startDate, state) {
   try {
     if (index >= endingProjectIndex) return;
 
@@ -103,13 +112,14 @@ async function executeQuery0(projects, index, cursor, startDate) {
       projects[index].replace("\r", "").split("/");
 
     const repoFullName = `${projectOwner}/${projectName}`;
+    const key = trackingKey(repoFullName, state);
 
-    if (!(repoFullName in tracking)) tracking[repoFullName] = 0;
-    if (tracking[repoFullName] >= getMaxIssues()) {
-      console.log(`[issuesMining] Reached issue sample cap: repo=${repoFullName}, maxIssues=${getMaxIssues()}`);
+    if (!(key in tracking)) tracking[key] = 0;
+    if (tracking[key] >= getMaxIssues(state)) {
+      console.log(`[issuesMining] Reached ${state} issue cap: repo=${repoFullName}, max=${getMaxIssues(state)}`);
       return;
     }
-    tracking[repoFullName]++;
+    tracking[key]++;
 
     // rotate if current token is running low
     if (tokenRemaining[tokenNum] !== -1 && tokenRemaining[tokenNum] <= ROTATION_THRESHOLD) {
@@ -121,7 +131,7 @@ async function executeQuery0(projects, index, cursor, startDate) {
     }
 
     const { repository, rateLimit } = await graphqlWithAuth(
-      projectQuery(projectOwner, projectName, cursor, startDate)
+      projectQuery(projectOwner, projectName, cursor, startDate, state)
     );
 
     tokenReset[tokenNum] = rateLimit.resetAt;
@@ -142,16 +152,16 @@ async function executeQuery0(projects, index, cursor, startDate) {
         }
       };
 
-      if (
-        node?.items?.totalCount > nbItemsPerQuery &&
-        node.items.pageInfo?.hasNextPage
-      ) {
+      if (node.items.pageInfo?.hasNextPage) {
         const extraItems = await getItems(
           projectOwner,
           projectName,
           cursor,
           node.items.pageInfo.endCursor,
-          node.items.edges
+          node.items.edges,
+          1,
+          startDate,
+          state
         );
 
         idata.issues.edges[0].node.items.edges = extraItems;
@@ -171,7 +181,7 @@ async function executeQuery0(projects, index, cursor, startDate) {
       return;
     }
 
-    return executeQuery0(projects, nextIndex, cursor, startDate);
+    return executeQuery0(projects, nextIndex, cursor, startDate, state);
 
   } catch (err) {
     console.error('Error:', err.message);
@@ -179,14 +189,14 @@ async function executeQuery0(projects, index, cursor, startDate) {
   }
 }
 
-async function getItems(owner, name, cursor, nextCursor, items, pageCount = 1) {
+async function getItems(owner, name, cursor, nextCursor, items, pageCount = 1, since, state) {
   try {
     if (pageCount >= getMaxTimelinePages()) {
       return items;
     }
 
     const { repository } = await graphqlWithAuth(
-      issueItemQuery(owner, name, cursor, nextCursor)
+      issueItemQuery(owner, name, cursor, nextCursor, since, state)
     );
 
     const newEdges = repository.issues.edges[0].node.items.edges;
@@ -208,7 +218,9 @@ async function getItems(owner, name, cursor, nextCursor, items, pageCount = 1) {
         cursor,
         itemPageInfo.endCursor,
         items,
-        pageCount + 1
+        pageCount + 1,
+        since,
+        state
       );
     }
 
@@ -228,14 +240,14 @@ export async function getIssues(owner, repo, startDate) {
 
   const projects = [`${owner}/${repo}`];
 
-  await executeQuery0(
-    projects,
-    currentProjectIndex,
-    currentCursor,
-    startDate
-  );
+  await executeQuery0(projects, currentProjectIndex, currentCursor, startDate, 'OPEN');
+  await executeQuery0(projects, currentProjectIndex, currentCursor, startDate, 'CLOSED');
 
   const values = Object.values(issues);
-  console.log(`[issuesMining] Issue sample collected: repo=${owner}/${repo}, issues=${values.length}, maxIssues=${getMaxIssues()}`);
+  console.log(
+    `[issuesMining] Issue sample collected: repo=${owner}/${repo}, ` +
+    `total=${values.length}, open=${tracking[trackingKey(`${owner}/${repo}`, 'OPEN')]}, ` +
+    `closed=${tracking[trackingKey(`${owner}/${repo}`, 'CLOSED')]}`
+  );
   return values;
 }

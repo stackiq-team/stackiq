@@ -81,6 +81,7 @@ export async function runIssuesMining(
       status: 'SUCCESS',
       metrics,
       rawData: result.raw,
+      issueData: result.issueData,
     };
 
   } catch (err) {
