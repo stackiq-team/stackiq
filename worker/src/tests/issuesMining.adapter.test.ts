@@ -33,11 +33,36 @@ const mockMetrics = {
 
 const mockRaw = [{ number: 1, closed: true }];
 
+const mockIssueData = [
+  {
+    number: 1,
+    publishedAt: "2024-12-14T00:00:00Z",
+    closedAt: "2024-12-15T00:00:00Z",
+    closed: true,
+    assigneesCount: 0,
+    firstAssignedAt: null,
+    closer: {
+      stateReason: "COMPLETED",
+      type: "PullRequest",
+      merged: true,
+      closedByBot: false,
+      closedByLogin: "someuser",
+      wasReclassified: false,
+    },
+    hasConnectedEvent: true,
+    hasPostCloseActivity: false,
+    tooManyTimelineItems: false,
+    timelineTotalCount: 5,
+    timelineCapturedCount: 5,
+  },
+];
+
 describe("runIssuesMining", () => {
   it("returns SUCCESS with metrics when analyzeIssues resolves", async () => {
     vi.mocked(analyzeIssues).mockResolvedValue({
       classifications: mockMetrics,
       raw: mockRaw,
+      issueData: mockIssueData,
     });
 
     const result = await runIssuesMining("facebook", "react", "2024-12-14");
@@ -46,6 +71,7 @@ describe("runIssuesMining", () => {
     expect(result.error).toBeUndefined();
     expect(result.metrics).toEqual(mockMetrics);
     expect(result.rawData).toEqual(mockRaw);
+    expect(result.issueData).toEqual(mockIssueData);
   });
 
   it("returns FAILED with nullMetrics when analyzeIssues throws", async () => {
@@ -111,6 +137,7 @@ describe("runIssuesMining", () => {
         uncodedCloseRate: null,
       },
       raw: [],
+      issueData: [],
     });
 
     const result = await runIssuesMining("facebook", "react", "2024-12-14");
@@ -118,5 +145,6 @@ describe("runIssuesMining", () => {
     expect(result.status).toBe("SUCCESS");
     expect(result.metrics.totalIssuesAnalyzed).toBe(10);
     expect(result.metrics.openIssues).toBeNull();
+    expect(result.issueData).toEqual([]);
   });
 });
