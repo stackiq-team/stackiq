@@ -264,7 +264,21 @@ export async function processAnalysisJob(
     );
 
     if (email) {
-      await sendResultEmail(result, email, analysis.resultToken ?? "");
+      const emailResult: AnalysisResultData = {
+        ...result,
+        dependencyScores: result.dependencyScores?.map((dependencyScore) => {
+          const enrichedDependency = dependencies.find(
+            (item) => item.dependency.id === dependencyScore.dependencyId
+          );
+
+          return {
+            ...dependencyScore,
+            dependencyName: enrichedDependency?.dependency.name,
+          };
+        }),
+      };
+
+      await sendResultEmail(emailResult, email, analysis.resultToken ?? "");
     } else {
       logger.log(`[worker] No email provided for analysis: analysisId=${analysisId}`);
     }
