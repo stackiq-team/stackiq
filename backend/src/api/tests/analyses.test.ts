@@ -112,9 +112,12 @@ describe("POST /analyses", () => {
         dependencies: true,
       },
     });
-    expect(enqueueAnalysisJobMock).toHaveBeenCalledWith({
-      analysisId: "analysis-1",
-    });
+    expect(enqueueAnalysisJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisId: "analysis-1",
+        email: "test@example.com",
+      })
+    );
   });
 
   it("creates an analysis when email is omitted", async () => {
@@ -176,9 +179,11 @@ describe("POST /analyses", () => {
         dependencies: true,
       },
     });
-    expect(enqueueAnalysisJobMock).toHaveBeenCalledWith({
-      analysisId: "analysis-1",
-    });
+    expect(enqueueAnalysisJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisId: "analysis-1",
+      })
+    );
   });
 
   it("rejects a package file with no dependencies", async () => {

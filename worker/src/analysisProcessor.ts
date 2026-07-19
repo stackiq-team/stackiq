@@ -19,6 +19,7 @@ import { fetchGitHubMinerData } from "./adapters/githubMinerAdapter.js";
 import type { GitHubMinerInput, GitHubMinerOutput } from "./types/githubMinerType.js";
 import type { IssuesMiningMetrics, IssuesMiningResult, IssueSummary } from "./types/issuesMining.types.js";
 import { DependencyAnalysisCacheManager } from "./cache/dependencyAnalysisCache.js";
+import { sendResultEmail } from "./adapters/email.adapter.js";
 
 type AnalysisResultData = {
   globalScore: number;
@@ -60,7 +61,7 @@ type AnalysisRepository = {
     findUnique(args: {
       where: { id: string };
       include: { dependencies: true };
-    }): Promise<{ id: string; dependencies: DependencyInput[] } | null>;
+    }): Promise<{ id: string; dependencies: DependencyInput[], resultToken?: string | null } | null>;
     update(args: {
       where: { id: string };
       data: {
@@ -118,13 +119,13 @@ export async function processAnalysisJob(
     logger = console,
     cacheManager = createDefaultCacheManager(prisma, logger),
   } = options;
-  const { analysisId } = job.data;
+  const { analysisId, email } = job.data;
 
   logger.log(
     `[worker] Job received: jobId=${job.id ?? analysisId}, analysisId=${analysisId}, attemptsMade=${job.attemptsMade}`
   );
 
-  logger.log(`[worker] Loading analysis: analysisId=${analysisId}`);
+  logger.log(`[worker] Loading analysis: analysisId=${analysisId}, email=${email ?? "none"}`);
 
   const analysis = await prisma.analysis.findUnique({
     where: { id: analysisId },
@@ -214,10 +215,13 @@ export async function processAnalysisJob(
       },
     });
 
-    const result = await runAnalysis({
+    const runAnalysisPayload: AnalysisJobData & { dependencies: EnrichedDependencyInput[] } = {
       analysisId,
       dependencies,
-    });
+      ...(email === undefined ? {} : { email }),
+    };
+
+    const result = await runAnalysis(runAnalysisPayload);
 
     logger.log(
       `[worker] Saving analysis result: analysisId=${analysisId}, globalScore=${result.globalScore}, riskLevel=${result.riskLevel}`
@@ -256,6 +260,32 @@ export async function processAnalysisJob(
     logger.log(
       `[worker] Analysis result saved: analysisId=${analysisId}, dependencyScores=${dependencyScores.length}`
     );
+
+    logger.log(
+      `[worker] Sending result email: analysisId=${analysisId}, globalScore=${result.globalScore}, email=${email ?? "none"}`
+    );
+
+    if (email) {
+      const dependencyScores = result.dependencyScores?.map((dependencyScore) => {
+        const enrichedDependency = dependencies.find(
+          (item) => item.dependency.id === dependencyScore.dependencyId
+        );
+
+        return {
+          ...dependencyScore,
+          dependencyName: enrichedDependency?.dependency.name,
+        };
+      });
+
+      const emailResult: AnalysisResultData = {
+        ...result,
+        ...(dependencyScores ? { dependencyScores } : {}),
+      };
+
+      await sendResultEmail(emailResult, email, analysis.resultToken ?? "");
+    } else {
+      logger.log(`[worker] No email provided for analysis: analysisId=${analysisId}`);
+    }
 
     logger.log(`[worker] Updating analysis to COMPLETED: analysisId=${analysisId}`);
 
