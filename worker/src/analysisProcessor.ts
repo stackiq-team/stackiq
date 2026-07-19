@@ -215,11 +215,13 @@ export async function processAnalysisJob(
       },
     });
 
-    const result = await runAnalysis({
+    const runAnalysisPayload: AnalysisJobData & { dependencies: EnrichedDependencyInput[] } = {
       analysisId,
-      email,
       dependencies,
-    });
+      ...(email === undefined ? {} : { email }),
+    };
+
+    const result = await runAnalysis(runAnalysisPayload);
 
     logger.log(
       `[worker] Saving analysis result: analysisId=${analysisId}, globalScore=${result.globalScore}, riskLevel=${result.riskLevel}`
@@ -264,18 +266,20 @@ export async function processAnalysisJob(
     );
 
     if (email) {
+      const dependencyScores = result.dependencyScores?.map((dependencyScore) => {
+        const enrichedDependency = dependencies.find(
+          (item) => item.dependency.id === dependencyScore.dependencyId
+        );
+
+        return {
+          ...dependencyScore,
+          dependencyName: enrichedDependency?.dependency.name,
+        };
+      });
+
       const emailResult: AnalysisResultData = {
         ...result,
-        dependencyScores: result.dependencyScores?.map((dependencyScore) => {
-          const enrichedDependency = dependencies.find(
-            (item) => item.dependency.id === dependencyScore.dependencyId
-          );
-
-          return {
-            ...dependencyScore,
-            dependencyName: enrichedDependency?.dependency.name,
-          };
-        }),
+        ...(dependencyScores ? { dependencyScores } : {}),
       };
 
       await sendResultEmail(emailResult, email, analysis.resultToken ?? "");
