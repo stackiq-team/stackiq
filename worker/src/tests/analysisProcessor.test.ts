@@ -205,7 +205,8 @@ describe("processAnalysisJob", () => {
         riskLevel: "LOW",
         summary: "Analysis completed.",
       }),
-      "test@example.com"
+      "test@example.com",
+      ""
     );
   });
 
