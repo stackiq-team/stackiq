@@ -2,7 +2,7 @@ import {
   type NormalizedInputs,
   type RiskLevel,
 } from "./../dependencyScore.js";
-import { MailtrapClient } from "mailtrap";
+import nodemailer from "nodemailer";
 
 type AnalysisResultData = {
   globalScore: number;
@@ -47,49 +47,7 @@ function getRiskColor(riskLevel: RiskLevel) {
   return { text: "#16a34a", border: "#bbf7d0" };
 }
 
-function renderDependencyCards(dependencyScores?: DependencyScoreData[]) {
-  if (!dependencyScores || dependencyScores.length === 0) {
-    return `
-      <div style="padding: 16px; border: 1px solid #fed7aa; border-radius: 12px; background: #ffffff; color: #6b7280;">
-        No dependency scores were included in this analysis.
-      </div>
-    `;
-  }
-
-  return dependencyScores
-    .map((dependency) => {
-      const riskColor = getRiskColor(dependency.riskLevel);
-      const dependencyTitle = dependency.dependencyName ?? dependency.dependencyId;
-      const warnings = dependency.warnings?.length
-        ? `<ul style="margin: 8px 0 0; padding-left: 18px; color: #6b7280;">${dependency.warnings
-            .map((warning) => `<li>${escapeHtml(warning)}</li>`)
-            .join("")}</ul>`
-        : `<p style="margin: 8px 0 0; color: #6b7280;">No warnings.</p>`;
-
-      return `
-        <div style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; background: #ffffff; margin-top: 12px;">
-          <div style="display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap;">
-            <strong style="font-size: 16px; color: #374151;">${escapeHtml(dependencyTitle)}</strong>
-            <span style="padding: 6px 10px; border-radius: 999px; background: #ffffff; border: 1px solid ${riskColor.border}; color: ${riskColor.text}; font-size: 12px; font-weight: 700;">
-              ${escapeHtml(dependency.riskLevel)}
-            </span>
-          </div>
-          <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; color: #4b5563;">
-            <div><strong style="color: #1f2937;">Score:</strong> ${dependency.score}</div>
-            <div><strong style="color: #1f2937;">Dependency ID:</strong> ${escapeHtml(dependency.dependencyId)}</div>
-          </div>
-          <div style="margin-top: 12px;">
-            <strong style="font-size: 13px; color: #1f2937; text-transform: uppercase; letter-spacing: 0.04em;">Warnings</strong>
-            ${warnings}
-          </div>
-        </div>
-      `;
-    })
-    .join("\n    ");
-}
-
 function buildEmailHtml(result: AnalysisResultData, resultUrl: string) {
-  const dependencyCards = renderDependencyCards(result.dependencyScores);
   const riskColor = getRiskColor(result.riskLevel as RiskLevel);
 
   return `
@@ -147,20 +105,28 @@ function buildEmailHtml(result: AnalysisResultData, resultUrl: string) {
           </div>
 
           <div style="padding: 28px;">
-            <div class="stackiq-stats" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px;">
-              <div class="stackiq-stat" style="padding: 16px; border-radius: 14px; background: #f9fafb; border: 1px solid ${riskColor.border};">
-                <div style="font-size: 12px; color: ${riskColor.text}; text-transform: uppercase; letter-spacing: 0.08em;">Global score</div>
-                <div style="margin-top: 6px; font-size: 28px; font-weight: 700; color: #1f2937;">${result.globalScore}</div>
-              </div>
-              <div class="stackiq-stat" style="padding: 16px; border-radius: 14px; background: #f9fafb; border: 1px solid ${riskColor.border};">
-                <div style="font-size: 12px; color: ${riskColor.text}; text-transform: uppercase; letter-spacing: 0.08em;">Risk level</div>
-                <div style="margin-top: 6px; font-size: 22px; font-weight: 700; color: ${riskColor.text};">${escapeHtml(result.riskLevel)}</div>
-              </div>
-              <div class="stackiq-stat" style="padding: 16px; border-radius: 14px; background: #f9fafb; border: 1px solid ${riskColor.border};">
-                <div style="font-size: 12px; color: ${riskColor.text}; text-transform: uppercase; letter-spacing: 0.08em;">Dependencies</div>
-                <div style="margin-top: 6px; font-size: 22px; font-weight: 700; color: #1f2937;">${result.dependencyScores?.length ?? 0}</div>
-              </div>
-            </div>
+              <table role="presentation" style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+              <tr>
+                <td style="padding: 0 6px 0 0; vertical-align: top; width: 33.33%;">
+                  <div style="padding: 16px; border-radius: 14px; background: #f9fafb; border: 1px solid ${riskColor.border};">
+                    <div style="font-size: 12px; color: ${riskColor.text}; text-transform: uppercase; letter-spacing: 0.08em;">Global score</div>
+                    <div style="margin-top: 6px; font-size: 22px; font-weight: 700; color: #1f2937;">${result.globalScore}</div>
+                  </div>
+                </td>
+                <td style="padding: 0 6px; vertical-align: top; width: 33.33%;">
+                  <div style="padding: 16px; border-radius: 14px; background: #f9fafb; border: 1px solid ${riskColor.border};">
+                    <div style="font-size: 12px; color: ${riskColor.text}; text-transform: uppercase; letter-spacing: 0.08em;">Risk level</div>
+                    <div style="margin-top: 6px; font-size: 22px; font-weight: 700; color: ${riskColor.text};">${escapeHtml(result.riskLevel)}</div>
+                  </div>
+                </td>
+                <td style="padding: 0 0 0 6px; vertical-align: top; width: 33.33%;">
+                  <div style="padding: 16px; border-radius: 14px; background: #f9fafb; border: 1px solid ${riskColor.border};">
+                    <div style="font-size: 12px; color: ${riskColor.text}; text-transform: uppercase; letter-spacing: 0.08em;">Dependencies</div>
+                    <div style="margin-top: 6px; font-size: 22px; font-weight: 700; color: #1f2937;">${result.dependencyScores?.length ?? 0}</div>
+                  </div>
+                </td>
+              </tr>
+            </table>
 
             <div class="stackiq-summary" style="padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid ${riskColor.border}; margin-bottom: 24px;">
               <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">Summary</div>
@@ -172,11 +138,6 @@ function buildEmailHtml(result: AnalysisResultData, resultUrl: string) {
                 Open result page
               </a>
               <div style="margin-top: 10px; font-size: 12px; color: #6b7280; word-break: break-all;">${resultUrl}</div>
-            </div>
-
-            <div>
-              <h2 style="margin: 0 0 12px; font-size: 18px; color: #0f172a;">Dependency scores</h2>
-              ${dependencyCards}
             </div>
           </div>
         </div>
@@ -218,27 +179,41 @@ export async function sendResultEmail(
   email: string,
   analysisPageToken: string
 ): Promise<boolean> {
-  const token = process.env.MAILTRAP_API_KEY;
+  const mailerUser = process.env.MAILER_USER;
+  const mailerPass = process.env.GMAIL_APP_PASSWORD;
+  const mailerHost = process.env.MAILER_HOST || "smtp.gmail.com";
+  const mailerPort = Number(process.env.MAILER_PORT ?? 587);
+  const mailerFrom = process.env.MAILER_FROM || `"STACKIQ" <${mailerUser}>`;
 
-  if (!token) {
-    console.warn("[worker] Mailtrap token is not configured, skipping email send.", token);
+  if (!mailerUser || !mailerPass) {
+    console.warn(
+      "[worker] Mailer credentials are not configured, skipping email send.",
+      {
+        mailerUser: Boolean(mailerUser),
+        mailerPass: Boolean(mailerPass),
+      }
+    );
     return false;
   }
 
-  const mailtrap = new MailtrapClient({ token, sandbox: true, testInboxId: 4789661 });
+  const transporter = nodemailer.createTransport({
+    host: mailerHost,
+    port: mailerPort,
+    secure: mailerPort === 465,
+    auth: {
+      user: mailerUser,
+      pass: mailerPass,
+    },
+  });
 
   try {
     const resultUrl = analysisPageToken.trim()
       ? `https://stackiq.dev/results/${encodeURIComponent(analysisPageToken)}`
       : "https://stackiq.dev/results";
 
-    const sender = {
-      email: "stackIq@stackiq.dev",
-      name: "STACKIQ",
-    };
-    const recipients = [{ email }];
-    await mailtrap.send({
-      from: sender,
+    const recipients = [email];
+    await transporter.sendMail({
+      from: mailerFrom,
       to: recipients,
       subject: `StackIQ analysis result: ${result.riskLevel}`,
       html: buildEmailHtml(result, resultUrl),
