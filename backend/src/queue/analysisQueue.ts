@@ -3,6 +3,8 @@ import { Queue } from "bullmq";
 export type AnalysisJobData = {
   analysisId: string;
   email?: string;
+  owner?: string;
+  repo?: string;
 };
 
 export const ANALYSIS_QUEUE_NAME =

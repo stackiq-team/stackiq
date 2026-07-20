@@ -9,6 +9,7 @@ import {
 } from "./queue/config.js";
 import { closeAnalysisQueue } from "./queue/analysisQueue.js";
 import { startWeeklyRefreshScheduler } from "./weeklyRefresh.js";
+import { refreshLeaderboardRepositories } from "./leaderboardSync.js";
 
 const connection = createRedisConnectionOptions();
 
@@ -28,6 +29,11 @@ const worker = new Worker<AnalysisJobData>(
 const weeklyRefreshScheduler = startWeeklyRefreshScheduler({
   prisma,
   logger: console,
+});
+
+refreshLeaderboardRepositories(prisma).catch((error) => {
+  console.error("[worker] Leaderboard refresh scheduler failed:", error);
+
 });
 
 worker.on("ready", () => {
