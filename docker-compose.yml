@@ -29,6 +29,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       BULLMQ_QUEUE_NAME: ${BULLMQ_QUEUE_NAME:-stackiq-analysis}
+      GITHUB_API_TOKEN: ${GITHUB_API_TOKEN:-}
     volumes:
       - ./backend:/app
       - /app/node_modules

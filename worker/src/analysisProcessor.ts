@@ -20,6 +20,7 @@ import type { GitHubMinerInput, GitHubMinerOutput } from "./types/githubMinerTyp
 import type { IssuesMiningMetrics, IssuesMiningResult, IssueSummary } from "./types/issuesMining.types.js";
 import { DependencyAnalysisCacheManager } from "./cache/dependencyAnalysisCache.js";
 import { sendResultEmail } from "./adapters/email.adapter.js";
+import { refreshLeaderboardRepositories } from "./leaderboardSync.js";
 
 type AnalysisResultData = {
   globalScore: number;
@@ -260,6 +261,20 @@ export async function processAnalysisJob(
     logger.log(
       `[worker] Analysis result saved: analysisId=${analysisId}, dependencyScores=${dependencyScores.length}`
     );
+
+    if (analysisId) {
+      await prisma.leaderboardRepository.updateMany({
+        where: { analysisId },
+        data: {
+          analysisScore: result.globalScore,
+          analysisStatus: AnalysisStatus.COMPLETED,
+          analysisResultToken: analysis?.resultToken ?? undefined,
+        },
+      });
+      logger.log(
+        `[worker] Leaderboard rows updated: analysisId=${analysisId}, analysisScore=${result.globalScore}`
+      );
+    }
 
     logger.log(
       `[worker] Sending result email: analysisId=${analysisId}, globalScore=${result.globalScore}, email=${email ?? "none"}`

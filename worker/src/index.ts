@@ -7,6 +7,7 @@ import {
   createRedisConnectionOptions,
   type AnalysisJobData,
 } from "./queue/config.js";
+import { refreshLeaderboardRepositories } from "./leaderboardSync.js";
 
 const connection = createRedisConnectionOptions();
 
@@ -22,6 +23,10 @@ const worker = new Worker<AnalysisJobData>(
     concurrency: 2,
   }
 );
+
+refreshLeaderboardRepositories(prisma).catch((error) => {
+  console.error("[worker] Leaderboard refresh scheduler failed:", error);
+});
 
 worker.on("ready", () => {
   console.log(`[worker] Ready and waiting for jobs: queue=${ANALYSIS_QUEUE_NAME}`);

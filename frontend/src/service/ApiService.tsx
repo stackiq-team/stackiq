@@ -52,6 +52,49 @@ export interface AnalysisLookupResponse {
   };
 }
 
+export type RepoLeaderboardItem = {
+  owner: string;
+  name: string;
+  fullName: string;
+  description: string | null;
+  url: string;
+  stars: number;
+  forks: number;
+  watchers: number;
+  issues: number;
+  pullRequests: number;
+  license: string | null;
+  primaryLanguage: string | null;
+  topics: string[];
+  createdAt: string;
+  pushedAt: string;
+  popularityScore: number;
+  activityScore: number;
+  compatibilityScore: number;
+  analysisScore: number | null;
+  analysisStatus: string | null;
+  analysisResultToken: string | null;
+  packageJsonPresent: boolean;
+};
+
+export interface LeaderboardLists {
+  popular: RepoLeaderboardItem[];
+  active: RepoLeaderboardItem[];
+  bestRanked: RepoLeaderboardItem[];
+}
+
+export interface LeaderboardResponse {
+  message: string;
+  lastUpdatedAt: string;
+  leaderboards: LeaderboardLists;
+}
+
+export interface LeaderboardsFetchResult {
+  success: boolean;
+  message?: string;
+  data?: LeaderboardResponse;
+}
+
 export interface AnalyseResponse {
   success: boolean;
   message?: string;
@@ -104,6 +147,66 @@ export async function fetchAnalysisByResultToken(
     const response = await fetch(
       `${API_BASE_URL}/analyses/${encodeURIComponent(resultToken)}`
     );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return {
+      success: true,
+      data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unknown error occurred",
+    };
+  }
+}
+
+export async function fetchLeaderboards(forceRefresh = false): Promise<LeaderboardsFetchResult> {
+  try {
+    const query = forceRefresh ? "?forceRefresh=true" : "";
+    const response = await fetch(`${API_BASE_URL}/leaderboards${query}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return {
+      success: true,
+      data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unknown error occurred",
+    };
+  }
+}
+
+export async function submitRepoAnalysis(
+  owner: string,
+  repo: string
+): Promise<AnalyseResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyses/repository`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ owner, repo }),
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP error ${response.status}`);

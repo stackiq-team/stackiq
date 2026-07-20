@@ -3,12 +3,14 @@ import cors from "cors";
 import { prisma } from "./db/client";
 import { redis } from "./redis/client";
 import analysisRoutes from "./api/route/analyses";
+import leaderboardRoutes from "./api/route/leaderboards";
 
 export const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use("/analyses", analysisRoutes);
+app.use("/leaderboards", leaderboardRoutes);
 
 app.get("/health", async (req, res) => {
     const health: Record<string, string> = { status: "ok" };

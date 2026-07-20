@@ -125,3 +125,39 @@ model DependencyAnalysisCache {
   @@index([expiresAt])
   @@map("dependency_analysis_cache")
 }
+
+model LeaderboardRepository {
+  id                      String   @id @default(uuid()) @db.Uuid
+  owner                   String
+  name                    String
+  fullName                String   @map("full_name")
+  url                     String
+  description             String?  
+  stars                   Int
+  forks                   Int
+  watchers                Int
+  issues                  Int
+  pullRequests            Int
+  license                 String?
+  primaryLanguage         String?
+  topics                  String[]
+  repositoryCreatedAt     DateTime @map("repository_created_at")
+  pushedAt                DateTime @map("pushed_at")
+  githubPopularityScore   Int      @map("github_popularity_score")
+  githubActivityScore     Int      @map("github_activity_score")
+  githubCompatibilityScore Int     @map("github_compatibility_score")
+  analysisScore           Int?     @map("analysis_score")
+  analysisStatus          String?  @map("analysis_status")
+  analysisResultToken     String?  @map("analysis_result_token")
+  analysisId              String?  @map("analysis_id")
+  packageJsonPresent      Boolean  @map("package_json_present")
+  category                String
+  rank                    Int
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@unique([fullName, category])
+  @@index([category, rank])
+  @@index([fullName])
+  @@map("leaderboard_repositories")
+}
