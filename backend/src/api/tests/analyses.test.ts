@@ -114,7 +114,7 @@ describe("POST /analyses", () => {
         dependencies: true,
       },
     });
-    expect(prismaMock.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(prismaMock.$executeRaw).toHaveBeenCalledTimes(2);
     expect(enqueueAnalysisJobMock).toHaveBeenCalledWith(
       expect.objectContaining({
         analysisId: "analysis-1",

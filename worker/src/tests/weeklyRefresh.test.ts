@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { AnalysisStatus, DependencyType } from "@prisma/client";
 import {
-  refreshTopRequestedStacks,
+  refreshTopRequestedDependencies,
   startWeeklyRefreshScheduler,
 } from "../weeklyRefresh.js";
 
@@ -10,33 +10,28 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("refreshTopRequestedStacks", () => {
-  it("queues analyses for top requested stacks and upgrades versions when available", async () => {
+describe("refreshTopRequestedDependencies", () => {
+  it("queues analyses for top requested dependencies and upgrades versions when available", async () => {
     const prisma = {
       $queryRaw: vi.fn().mockResolvedValue([
         {
-          stackHash: "stack-1",
-          stackPayload: {
-            dependencies: [
-              {
-                name: "react",
-                versionRequirement: "^19.0.0",
-              },
-            ],
-            devDependencies: [
-              {
-                name: "vite",
-                versionRequirement: "^5.0.0",
-              },
-            ],
-          },
+          dependencyName: "react",
+          dependencyType: "DEPENDENCY",
+          lastVersionRequirement: "^19.0.0",
+          requestCount: 25,
+        },
+        {
+          dependencyName: "vite",
+          dependencyType: "DEV_DEPENDENCY",
+          lastVersionRequirement: "^5.0.0",
           requestCount: 17,
         },
       ]),
       analysis: {
         create: vi
           .fn()
-          .mockResolvedValueOnce({ id: "analysis-1" }),
+          .mockResolvedValueOnce({ id: "analysis-1" })
+          .mockResolvedValueOnce({ id: "analysis-2" }),
       },
     };
 
@@ -61,15 +56,15 @@ describe("refreshTopRequestedStacks", () => {
         })
     );
 
-    const enqueued = await refreshTopRequestedStacks({
+    const enqueued = await refreshTopRequestedDependencies({
       prisma: prisma as any,
       enqueue,
       logger,
       topLimit: 10,
     });
 
-    expect(enqueued).toBe(1);
-    expect(prisma.analysis.create).toHaveBeenCalledWith({
+    expect(enqueued).toBe(2);
+    expect(prisma.analysis.create).toHaveBeenNthCalledWith(1, {
       data: {
         status: AnalysisStatus.PENDING,
         dependencies: {
@@ -79,6 +74,15 @@ describe("refreshTopRequestedStacks", () => {
               versionRequirement: "19.1.0",
               type: DependencyType.DEPENDENCY,
             },
+          ],
+        },
+      },
+    });
+    expect(prisma.analysis.create).toHaveBeenNthCalledWith(2, {
+      data: {
+        status: AnalysisStatus.PENDING,
+        dependencies: {
+          create: [
             {
               name: "vite",
               versionRequirement: "7.0.0",
@@ -88,18 +92,16 @@ describe("refreshTopRequestedStacks", () => {
         },
       },
     });
-    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(enqueue).toHaveBeenCalledTimes(2);
   });
 
-  it("skips malformed stack payloads", async () => {
+  it("skips dependencies with invalid types", async () => {
     const prisma = {
       $queryRaw: vi.fn().mockResolvedValue([
         {
-          stackHash: "stack-1",
-          stackPayload: {
-            dependencies: "invalid",
-            devDependencies: [],
-          },
+          dependencyName: "react",
+          dependencyType: "INVALID",
+          lastVersionRequirement: "^19.0.0",
           requestCount: 25,
         },
       ]),
@@ -115,7 +117,7 @@ describe("refreshTopRequestedStacks", () => {
       error: vi.fn(),
     };
 
-    const enqueued = await refreshTopRequestedStacks({
+    const enqueued = await refreshTopRequestedDependencies({
       prisma: prisma as any,
       enqueue: enqueue as any,
       logger,

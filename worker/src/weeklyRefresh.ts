@@ -1,19 +1,10 @@
 import { AnalysisStatus, DependencyType } from "@prisma/client";
 import { enqueueAnalysisJob } from "./queue/analysisQueue.js";
 
-type StackPayloadEntry = {
-  name: string;
-  versionRequirement: string;
-};
-
-type StackPayload = {
-  dependencies: StackPayloadEntry[];
-  devDependencies: StackPayloadEntry[];
-};
-
-type TopRequestedStack = {
-  stackHash: string;
-  stackPayload: unknown;
+type TopRequestedDependency = {
+  dependencyName: string;
+  dependencyType: string;
+  lastVersionRequirement: string;
   requestCount: number;
 };
 
@@ -56,48 +47,66 @@ type WeeklyRefreshScheduler = {
 const DEFAULT_TOP_LIMIT = 10;
 const DEFAULT_WEEKLY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export async function refreshTopRequestedStacks(options: WeeklyRefreshOptions) {
+export async function refreshTopRequestedDependencies(options: WeeklyRefreshOptions) {
   const logger = options.logger ?? console;
   const enqueue = options.enqueue ?? enqueueAnalysisJob;
-  const topLimit = sanitizeTopLimit(options.topLimit ?? Number(process.env.WEEKLY_REFRESH_TOP_LIMIT ?? DEFAULT_TOP_LIMIT));
+  const topLimit = sanitizeTopLimit(options.topLimit ?? Number(process.env.DEPENDENCY_SYNC_TOP_LIMIT ?? DEFAULT_TOP_LIMIT));
 
-  const stacks = await options.prisma.$queryRaw<TopRequestedStack[]>`
+  const dependencies = await options.prisma.$queryRaw<TopRequestedDependency[]>`
     SELECT
-      stack_hash AS "stackHash",
-      stack_payload AS "stackPayload",
+      dependency_name AS "dependencyName",
+      dependency_type::text AS "dependencyType",
+      last_version_requirement AS "lastVersionRequirement",
       request_count AS "requestCount"
-    FROM stack_request_stats
+    FROM dependency_request_stats
     ORDER BY request_count DESC, updated_at DESC
     LIMIT ${topLimit}
   `;
 
+  if (dependencies.length === 0) {
+    logger.log("[worker] Weekly refresh found no requested dependencies to rescan.");
+  } else {
+    logger.log(
+      `[worker] Weekly refresh selected dependencies: ${dependencies
+        .map(
+          (dependency) =>
+            `${dependency.dependencyName}:${dependency.dependencyType}(requests=${dependency.requestCount})`
+        )
+        .join(", ")}`
+    );
+  }
+
   let enqueued = 0;
 
-  for (const stack of stacks) {
-    const stackPayload = parseStackPayload(stack.stackPayload);
+  for (const dependency of dependencies) {
+    const dependencyType = toDependencyType(dependency.dependencyType);
 
-    if (!stackPayload) {
-      logger.warn(`[worker] Weekly refresh skipped malformed stack payload: hash=${stack.stackHash}`);
-      continue;
-    }
-
-    const dependencyRecords = await buildDependencyRecordsFromStackPayload(
-      stackPayload,
-      logger
-    );
-
-    if (dependencyRecords.length === 0) {
+    if (!dependencyType) {
       logger.warn(
-        `[worker] Weekly refresh skipped empty stack payload: hash=${stack.stackHash}`
+        `[worker] Weekly refresh skipped dependency with invalid type: ${dependency.dependencyName} (${dependency.dependencyType})`
       );
       continue;
     }
+
+    const latestVersion =
+      (await fetchLatestNpmVersion(dependency.dependencyName, logger)) ??
+      dependency.lastVersionRequirement;
+
+    logger.log(
+      `[worker] Weekly refresh rescanning dependency: name=${dependency.dependencyName}, type=${dependencyType}, requestCount=${dependency.requestCount}, version=${latestVersion}`
+    );
 
     const analysis = await options.prisma.analysis.create({
       data: {
         status: AnalysisStatus.PENDING,
         dependencies: {
-          create: dependencyRecords,
+          create: [
+            {
+              name: dependency.dependencyName,
+              versionRequirement: latestVersion,
+              type: dependencyType,
+            },
+          ],
         },
       },
     });
@@ -106,7 +115,7 @@ export async function refreshTopRequestedStacks(options: WeeklyRefreshOptions) {
     enqueued += 1;
 
     logger.log(
-      `[worker] Weekly refresh queued analysis: analysisId=${analysis.id}, stackHash=${stack.stackHash}, dependencies=${dependencyRecords.length}, requestCount=${stack.requestCount}`
+      `[worker] Weekly refresh queued analysis: analysisId=${analysis.id}, dependency=${dependency.dependencyName}, type=${dependencyType}, requestCount=${dependency.requestCount}`
     );
   }
 
@@ -119,7 +128,7 @@ export function startWeeklyRefreshScheduler(
   options: WeeklyRefreshSchedulerOptions
 ): WeeklyRefreshScheduler {
   const logger = options.logger ?? console;
-  const enabled = options.enabled ?? process.env.WEEKLY_REFRESH_ENABLED !== "false";
+  const enabled = options.enabled ?? process.env.DEPENDENCY_SYNC_ENABLED !== "false";
 
   if (!enabled) {
     logger.log("[worker] Weekly refresh scheduler is disabled.");
@@ -130,9 +139,9 @@ export function startWeeklyRefreshScheduler(
   }
 
   const intervalMs = sanitizeIntervalMs(
-    options.intervalMs ?? Number(process.env.WEEKLY_REFRESH_INTERVAL_MS ?? DEFAULT_WEEKLY_INTERVAL_MS)
+    options.intervalMs ?? Number(process.env.DEPENDENCY_SYNC_INTERVAL_MS ?? DEFAULT_WEEKLY_INTERVAL_MS)
   );
-  const runOnStart = options.runOnStart ?? process.env.WEEKLY_REFRESH_RUN_ON_START === "true";
+  const runOnStart = options.runOnStart ?? process.env.DEPENDENCY_SYNC_RUN_ON_START === "true";
 
   let isRunning = false;
 
@@ -144,7 +153,7 @@ export function startWeeklyRefreshScheduler(
 
     isRunning = true;
     try {
-      return await refreshTopRequestedStacks(options);
+      return await refreshTopRequestedDependencies(options);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown weekly refresh error";
       logger.error(`[worker] Weekly refresh failed: ${message}`);
@@ -184,6 +193,12 @@ function sanitizeIntervalMs(value: number) {
   return Math.floor(value);
 }
 
+function toDependencyType(value: string) {
+  if (value === DependencyType.DEPENDENCY) return DependencyType.DEPENDENCY;
+  if (value === DependencyType.DEV_DEPENDENCY) return DependencyType.DEV_DEPENDENCY;
+  return null;
+}
+
 async function fetchLatestNpmVersion(
   packageName: string,
   logger: Pick<Console, "warn">
@@ -214,73 +229,4 @@ async function fetchLatestNpmVersion(
     );
     return null;
   }
-}
-
-function parseStackPayload(payload: unknown): StackPayload | null {
-  if (!payload || typeof payload !== "object") return null;
-
-  const rawDependencies = (payload as { dependencies?: unknown }).dependencies;
-  const rawDevDependencies = (payload as { devDependencies?: unknown }).devDependencies;
-
-  const dependencies = normalizeStackEntries(rawDependencies);
-  const devDependencies = normalizeStackEntries(rawDevDependencies);
-
-  if (!dependencies || !devDependencies) return null;
-
-  return {
-    dependencies,
-    devDependencies,
-  };
-}
-
-function normalizeStackEntries(entries: unknown): StackPayloadEntry[] | null {
-  if (!Array.isArray(entries)) return [];
-
-  const normalized = entries
-    .filter((entry): entry is StackPayloadEntry => {
-      if (!entry || typeof entry !== "object") return false;
-      const { name, versionRequirement } = entry as Record<string, unknown>;
-      return typeof name === "string" && typeof versionRequirement === "string";
-    })
-    .map((entry) => ({
-      name: entry.name,
-      versionRequirement: entry.versionRequirement,
-    }));
-
-  return normalized;
-}
-
-async function buildDependencyRecordsFromStackPayload(
-  payload: StackPayload,
-  logger: Pick<Console, "warn">
-) {
-  const records: Array<{
-    name: string;
-    versionRequirement: string;
-    type: DependencyType;
-  }> = [];
-
-  for (const dependency of payload.dependencies) {
-    const latestVersion =
-      (await fetchLatestNpmVersion(dependency.name, logger)) ?? dependency.versionRequirement;
-
-    records.push({
-      name: dependency.name,
-      versionRequirement: latestVersion,
-      type: DependencyType.DEPENDENCY,
-    });
-  }
-
-  for (const dependency of payload.devDependencies) {
-    const latestVersion =
-      (await fetchLatestNpmVersion(dependency.name, logger)) ?? dependency.versionRequirement;
-
-    records.push({
-      name: dependency.name,
-      versionRequirement: latestVersion,
-      type: DependencyType.DEV_DEPENDENCY,
-    });
-  }
-
-  return records;
 }
