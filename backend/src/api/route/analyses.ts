@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import { createHash, randomUUID } from "node:crypto";
 import { prisma } from "../../db/client";
 import { AnalysisStatus, DependencyType } from "../../generated/prisma/enums";
 import { enqueueAnalysisJob } from "../../queue/analysisQueue";
@@ -10,6 +11,11 @@ type DependencyInput = {
   name: string;
   versionRequirement: string;
   type: DependencyType;
+};
+
+type StackPayloadEntry = {
+  name: string;
+  versionRequirement: string;
 };
 
 const upload = multer({
@@ -105,6 +111,13 @@ router.post(
       ];
       const dependencyCount = Object.keys(dependencies).length;
       const devDependencyCount = Object.keys(devDependencies).length;
+      const normalizedStackPayload = {
+        dependencies: toSortedStackEntries(dependencies),
+        devDependencies: toSortedStackEntries(devDependencies),
+      };
+      const stackHash = createHash("sha256")
+        .update(JSON.stringify(normalizedStackPayload))
+        .digest("hex");
 
       if (dependencyRecords.length === 0) {
         console.warn(
@@ -131,6 +144,30 @@ router.post(
           dependencies: true,
         },
       });
+
+      await prisma.$executeRaw`
+        INSERT INTO "stack_request_stats" (
+          "id",
+          "stack_hash",
+          "stack_payload",
+          "request_count",
+          "created_at",
+          "updated_at"
+        )
+        VALUES (
+          ${randomUUID()},
+          ${stackHash},
+          CAST(${JSON.stringify(normalizedStackPayload)} AS jsonb),
+          1,
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT ("stack_hash")
+        DO UPDATE SET
+          "request_count" = "stack_request_stats"."request_count" + 1,
+          "stack_payload" = EXCLUDED."stack_payload",
+          "updated_at" = NOW()
+      `;
 
       console.log(
         `[backend] Analysis created: analysisId=${analysis.id}, status=${analysis.status}, dependencyRecords=${analysis.dependencies.length}`
@@ -167,3 +204,12 @@ router.post(
 );
 
 export default router;
+
+function toSortedStackEntries(dependencies: Record<string, unknown>): StackPayloadEntry[] {
+  return Object.entries(dependencies)
+    .map(([name, versionRequirement]) => ({
+      name,
+      versionRequirement: String(versionRequirement),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
