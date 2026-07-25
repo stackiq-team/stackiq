@@ -7,6 +7,7 @@ const { prismaMock, enqueueAnalysisJobMock } = vi.hoisted(() => ({
       create: vi.fn(),
       findUnique: vi.fn(),
     },
+    $executeRaw: vi.fn(),
     $queryRaw: vi.fn(),
   },
   enqueueAnalysisJobMock: vi.fn(),
@@ -31,6 +32,7 @@ import { app } from "../../app";
 describe("POST /analyses", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.$executeRaw.mockResolvedValue(1);
 
     prismaMock.analysis.create.mockResolvedValue({
       id: "analysis-1",
@@ -112,6 +114,7 @@ describe("POST /analyses", () => {
         dependencies: true,
       },
     });
+    expect(prismaMock.$executeRaw).toHaveBeenCalledTimes(2);
     expect(enqueueAnalysisJobMock).toHaveBeenCalledWith(
       expect.objectContaining({
         analysisId: "analysis-1",
@@ -179,6 +182,7 @@ describe("POST /analyses", () => {
         dependencies: true,
       },
     });
+    expect(prismaMock.$executeRaw).toHaveBeenCalledTimes(1);
     expect(enqueueAnalysisJobMock).toHaveBeenCalledWith(
       expect.objectContaining({
         analysisId: "analysis-1",
@@ -206,6 +210,7 @@ describe("POST /analyses", () => {
       "package.json must contain dependencies or devDependencies."
     );
     expect(prismaMock.analysis.create).not.toHaveBeenCalled();
+    expect(prismaMock.$executeRaw).not.toHaveBeenCalled();
     expect(enqueueAnalysisJobMock).not.toHaveBeenCalled();
   });
 });

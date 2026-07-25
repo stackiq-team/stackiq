@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import { randomUUID } from "node:crypto";
 import { prisma } from "../../db/client";
 import { AnalysisStatus, DependencyType } from "../../generated/prisma/enums";
 import { enqueueAnalysisJob } from "../../queue/analysisQueue";
@@ -131,6 +132,36 @@ router.post(
           dependencies: true,
         },
       });
+
+      await Promise.all(
+        dependencyRecords.map((dependency) =>
+          prisma.$executeRaw`
+            INSERT INTO "dependency_request_stats" (
+              "id",
+              "dependency_name",
+              "dependency_type",
+              "last_version_requirement",
+              "request_count",
+              "created_at",
+              "updated_at"
+            )
+            VALUES (
+              ${randomUUID()},
+              ${dependency.name},
+              CAST(${dependency.type} AS "DependencyType"),
+              ${dependency.versionRequirement},
+              1,
+              NOW(),
+              NOW()
+            )
+            ON CONFLICT ("dependency_name", "dependency_type")
+            DO UPDATE SET
+              "request_count" = "dependency_request_stats"."request_count" + 1,
+              "last_version_requirement" = EXCLUDED."last_version_requirement",
+              "updated_at" = NOW()
+          `
+        )
+      );
 
       console.log(
         `[backend] Analysis created: analysisId=${analysis.id}, status=${analysis.status}, dependencyRecords=${analysis.dependencies.length}`

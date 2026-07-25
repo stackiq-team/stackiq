@@ -51,6 +51,32 @@ model Analysis {
   @@map("analyses")
 }
 
+model StackRequestStat {
+  id           String   @id @default(uuid()) @db.Uuid
+  stackHash    String   @unique @map("stack_hash")
+  stackPayload Json     @map("stack_payload")
+  requestCount Int      @default(0) @map("request_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([requestCount])
+  @@map("stack_request_stats")
+}
+
+model DependencyRequestStat {
+  id                     String         @id @default(uuid()) @db.Uuid
+  dependencyName         String         @map("dependency_name")
+  dependencyType         DependencyType @map("dependency_type")
+  lastVersionRequirement String         @map("last_version_requirement")
+  requestCount           Int            @default(0) @map("request_count")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
+
+  @@unique([dependencyName, dependencyType])
+  @@index([requestCount])
+  @@map("dependency_request_stats")
+}
+
 model AnalysisResult {
   id          String   @id @default(uuid()) @db.Uuid
   analysisId  String   @unique @map("analysis_id") @db.Uuid

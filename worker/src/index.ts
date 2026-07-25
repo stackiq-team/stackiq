@@ -7,6 +7,8 @@ import {
   createRedisConnectionOptions,
   type AnalysisJobData,
 } from "./queue/config.js";
+import { closeAnalysisQueue } from "./queue/analysisQueue.js";
+import { startWeeklyRefreshScheduler } from "./weeklyRefresh.js";
 
 const connection = createRedisConnectionOptions();
 
@@ -22,6 +24,11 @@ const worker = new Worker<AnalysisJobData>(
     concurrency: 2,
   }
 );
+
+const weeklyRefreshScheduler = startWeeklyRefreshScheduler({
+  prisma,
+  logger: console,
+});
 
 worker.on("ready", () => {
   console.log(`[worker] Ready and waiting for jobs: queue=${ANALYSIS_QUEUE_NAME}`);
@@ -49,7 +56,9 @@ worker.on("error", (error) => {
 
 async function shutdown() {
   console.log("[worker] Shutting down...");
+  weeklyRefreshScheduler.stop();
   await worker.close();
+  await closeAnalysisQueue();
   await prisma.$disconnect();
   console.log("[worker] Shutdown complete");
 }
