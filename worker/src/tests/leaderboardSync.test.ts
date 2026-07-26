@@ -180,7 +180,7 @@ describe("leaderboardSync - Refresh Lifecycle", () => {
     ];
 
     repos.sort((a, b) => a.rank - b.rank);
-    expect(repos[0].rank).toBe(1);
-    expect(repos[2].rank).toBe(3);
+    expect(repos[0]!.rank).toBe(1);
+    expect(repos[2]!.rank).toBe(3);
   });
 });
