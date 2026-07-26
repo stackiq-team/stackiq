@@ -7,6 +7,9 @@ import {
   createRedisConnectionOptions,
   type AnalysisJobData,
 } from "./queue/config.js";
+import { closeAnalysisQueue } from "./queue/analysisQueue.js";
+import { startWeeklyRefreshScheduler } from "./weeklyRefresh.js";
+import { refreshLeaderboardRepositories } from "./leaderboardSync.js";
 
 const connection = createRedisConnectionOptions();
 const workerConcurrency = 2;
@@ -26,6 +29,16 @@ const worker = new Worker<AnalysisJobData>(
     concurrency: workerConcurrency,
   }
 );
+
+const weeklyRefreshScheduler = startWeeklyRefreshScheduler({
+  prisma,
+  logger: console,
+});
+
+refreshLeaderboardRepositories(prisma).catch((error) => {
+  console.error("[worker] Leaderboard refresh scheduler failed:", error);
+
+});
 
 worker.on("ready", () => {
   console.log(`[worker] Ready and waiting for jobs: queue=${ANALYSIS_QUEUE_NAME}`);
@@ -53,7 +66,9 @@ worker.on("error", (error) => {
 
 async function shutdown() {
   console.log("[worker] Shutting down...");
+  weeklyRefreshScheduler.stop();
   await worker.close();
+  await closeAnalysisQueue();
   await prisma.$disconnect();
   console.log("[worker] Shutdown complete");
 }

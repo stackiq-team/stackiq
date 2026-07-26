@@ -16,6 +16,7 @@ export function Header() {
             <nav className="nav-links">
                 <button className={location.pathname === '/' ? 'active' : ''} onClick={() => navigate('/')}>Analyze</button>
                 {isResultPage && <span className="nav-context">Dependency intelligence</span>}
+                <button className={location.pathname.startsWith('/explore') || location.pathname === '/leaderboard' ? 'active' : ''} onClick={() => navigate('/explore')}>Explore</button>
             </nav>
             </div>
             <div className="nav-right" />

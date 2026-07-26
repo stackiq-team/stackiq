@@ -54,6 +54,32 @@ model Analysis {
   @@map("analyses")
 }
 
+model StackRequestStat {
+  id           String   @id @default(uuid()) @db.Uuid
+  stackHash    String   @unique @map("stack_hash")
+  stackPayload Json     @map("stack_payload")
+  requestCount Int      @default(0) @map("request_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([requestCount])
+  @@map("stack_request_stats")
+}
+
+model DependencyRequestStat {
+  id                     String         @id @default(uuid()) @db.Uuid
+  dependencyName         String         @map("dependency_name")
+  dependencyType         DependencyType @map("dependency_type")
+  lastVersionRequirement String         @map("last_version_requirement")
+  requestCount           Int            @default(0) @map("request_count")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
+
+  @@unique([dependencyName, dependencyType])
+  @@index([requestCount])
+  @@map("dependency_request_stats")
+}
+
 model AnalysisResult {
   id          String   @id @default(uuid()) @db.Uuid
   analysisId  String   @unique @map("analysis_id") @db.Uuid
@@ -176,4 +202,40 @@ model DependencyRelationshipCache {
   @@index([targetPackageName])
   @@index([expiresAt])
   @@map("dependency_relationship_cache")
+}
+
+model LeaderboardRepository {
+  id                      String   @id @default(uuid()) @db.Uuid
+  owner                   String
+  name                    String
+  fullName                String   @map("full_name")
+  url                     String
+  description             String?  
+  stars                   Int
+  forks                   Int
+  watchers                Int
+  issues                  Int
+  pullRequests            Int
+  license                 String?
+  primaryLanguage         String?
+  topics                  String[]
+  repositoryCreatedAt     DateTime @map("repository_created_at")
+  pushedAt                DateTime @map("pushed_at")
+  githubPopularityScore   Int      @map("github_popularity_score")
+  githubActivityScore     Int      @map("github_activity_score")
+  githubCompatibilityScore Int     @map("github_compatibility_score")
+  analysisScore           Int?     @map("analysis_score")
+  analysisStatus          String?  @map("analysis_status")
+  analysisResultToken     String?  @map("analysis_result_token")
+  analysisId              String?  @map("analysis_id")
+  packageJsonPresent      Boolean  @map("package_json_present")
+  category                String
+  rank                    Int
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@unique([fullName, category])
+  @@index([category, rank])
+  @@index([fullName])
+  @@map("leaderboard_repositories")
 }

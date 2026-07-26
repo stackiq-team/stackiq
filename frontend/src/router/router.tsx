@@ -1,8 +1,10 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { MainLayout } from '../pages/MainLayout';
-import  HomePage  from '../pages/HomePage';
+import HomePage from '../pages/HomePage';
 import ResultPage from '../pages/ResultPage';
 import DependencyDetailPage from '../pages/DependencyDetailPage';
+import LeaderboardPage from '../pages/LeaderboardPage';
+import { Navigate } from 'react-router-dom';
 
 const router = createBrowserRouter([
   {
@@ -11,15 +13,27 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <HomePage/>
+        element: <HomePage />
+      },
+      {
+        path: 'explore',
+        element: <LeaderboardPage />
+      },
+      {
+        path: 'explore/*',
+        element: <Navigate to="/explore" replace />
+      },
+      {
+        path: 'leaderboard',
+        element: <Navigate to="/explore" replace />
       },
       {
         path: 'results/:resultToken',
-        element: <ResultPage/>
+        element: <ResultPage />
       },
       {
         path: 'results/:resultToken/dependency/:dependencyName',
-        element: <DependencyDetailPage/>
+        element: <DependencyDetailPage />
       }
     ]
   }
