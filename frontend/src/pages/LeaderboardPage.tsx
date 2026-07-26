@@ -185,7 +185,7 @@ export default function LeaderboardPage() {
       setSelectionError(null);
 
       if (!repo.packageJsonPresent) {
-        setSelectionError("Unsupported format: this repository does not have a package.json and cannot be analysed.");
+        window.open(repo.url, "_blank", "noopener,noreferrer");
         return;
       }
 

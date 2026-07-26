@@ -1,19 +1,11 @@
 import { AnalysisStatus, DependencyType } from "@prisma/client";
 import { PrismaClient } from "@prisma/client";
-import { Queue } from "bullmq";
 import * as https from "https";
-import { fetchGitHubMinerData } from "./adapters/githubMinerAdapter.js";
-import { runIssuesMining } from "./adapters/issuesMining.adapter.js";
-import { DependencyAnalysisCacheManager } from "./cache/dependencyAnalysisCache.js";
-import { scoreDependencies } from "./dependencyScore.js";
-import { createRedisConnectionOptions, type AnalysisJobData, ANALYSIS_QUEUE_NAME } from "./queue/config.js";
 import { enqueueAnalysisJob } from "./queue/analysisQueue.js";
-import { Redis } from "ioredis";
 
 const DEFAULT_EXPLORE_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
 const DEFAULT_EXPLORE_POPULAR_LIMIT = 3;
 const DEFAULT_GITHUB_SEARCH_LIMIT = 50;
-const RESULT_CATEGORIES = ["popular", "active", "bestRanked"] as const;
 
 function getConfiguredExplorePopularLimit() {
   const value = Number(process.env.EXPLORE_TOP_LIMIT ?? process.env.LEADERBOARD_TOP_LIMIT ?? DEFAULT_EXPLORE_POPULAR_LIMIT);
@@ -75,38 +67,6 @@ function buildLeaderboardScore(repo: any) {
       normalizeCappedMetric(repo.repositoryTopics.edges.length, 10) * 0.4 +
         (repo.primaryLanguage ? 100 : 30) * 0.6
     ),
-  };
-}
-
-function mapRepositoryToRow(repo: any, category: string, rank: number) {
-  const { popularityScore, activityScore, compatibilityScore } = buildLeaderboardScore(repo);
-
-  return {
-    owner: repo.owner.login,
-    name: repo.name,
-    fullName: repo.nameWithOwner,
-    url: repo.url,
-    description: repo.description,
-    stars: repo.stargazerCount,
-    forks: repo.forkCount,
-    watchers: repo.watchers.totalCount,
-    issues: repo.issues.totalCount,
-    pullRequests: repo.pullRequests.totalCount,
-    license: repo.licenseInfo?.spdxId ?? null,
-    primaryLanguage: repo.primaryLanguage?.name ?? null,
-    topics: repo.repositoryTopics.edges.map((edge: any) => edge.node.topic.name),
-    repositoryCreatedAt: new Date(repo.createdAt),
-    pushedAt: new Date(repo.pushedAt),
-    githubPopularityScore: popularityScore,
-    githubActivityScore: activityScore,
-    githubCompatibilityScore: compatibilityScore,
-    analysisScore: null,
-    analysisStatus: null,
-    analysisResultToken: null,
-    analysisId: null,
-    packageJsonPresent: false,
-    category,
-    rank,
   };
 }
 
