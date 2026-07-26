@@ -1,6 +1,16 @@
 import { prisma } from "../db/client";
 import type { RepoLeaderboardItem, LeaderboardLists } from "./leaderboardTypes";
 
+const DEFAULT_EXPLORE_POPULAR_LIMIT = 3;
+
+function getConfiguredPopularLimit() {
+  const value = Number(process.env.EXPLORE_TOP_LIMIT ?? process.env.LEADERBOARD_TOP_LIMIT ?? DEFAULT_EXPLORE_POPULAR_LIMIT);
+  if (!Number.isFinite(value) || value <= 0) {
+    return DEFAULT_EXPLORE_POPULAR_LIMIT;
+  }
+  return Math.floor(value);
+}
+
 function mapLeaderboardRow(row: any): RepoLeaderboardItem {
   return {
     owner: row.owner,
@@ -28,17 +38,18 @@ function mapLeaderboardRow(row: any): RepoLeaderboardItem {
   };
 }
 
-export async function getLeaderboardsFromDb(): Promise<{ lastUpdatedAt: string; leaderboards: LeaderboardLists }> {
+export async function getLeaderboardsFromDb(popularLimit = getConfiguredPopularLimit()): Promise<{ lastUpdatedAt: string; leaderboards: LeaderboardLists }> {
   const latestUpdatedAt = new Date().toISOString();
 
   const categories = ["popular", "active", "bestRanked"] as const;
 
   const results = await Promise.all(
     categories.map(async (category) => {
+      const take = category === "popular" ? popularLimit : 3;
       const rows = await prisma.leaderboardRepository.findMany({
         where: { category },
         orderBy: [{ rank: "asc" }],
-        take: 3,
+        take,
       });
 
       return rows.map(mapLeaderboardRow);

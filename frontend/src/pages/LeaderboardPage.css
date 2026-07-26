@@ -128,16 +128,35 @@
 
 .repo-scores {
   justify-content: center;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
 }
 
 .repo-score-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 6rem;
-  padding: 0.5rem 0.75rem;
+  flex: 1;
+  padding: 0.5rem 0.5rem;
   border-radius: 0.75rem;
   background: #f8fafc;
+}
+
+.repo-language {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.repo-language span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #f8fafc;
+  border-radius: 9999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.9rem;
+  color: #374151;
 }
 
 .repo-score-value {

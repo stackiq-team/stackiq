@@ -7,11 +7,29 @@ import { runIssuesMining } from "./adapters/issuesMining.adapter.js";
 import { DependencyAnalysisCacheManager } from "./cache/dependencyAnalysisCache.js";
 import { scoreDependencies } from "./dependencyScore.js";
 import { createRedisConnectionOptions, type AnalysisJobData, ANALYSIS_QUEUE_NAME } from "./queue/config.js";
+import { enqueueAnalysisJob } from "./queue/analysisQueue.js";
 import { Redis } from "ioredis";
 
-const LEADERBOARD_REFRESH_CRON = process.env.LEADERBOARD_REFRESH_CRON || "0 0 * * 0"; // Sunday at midnight
+const DEFAULT_EXPLORE_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
+const DEFAULT_EXPLORE_POPULAR_LIMIT = 3;
 const DEFAULT_GITHUB_SEARCH_LIMIT = 50;
 const RESULT_CATEGORIES = ["popular", "active", "bestRanked"] as const;
+
+function getConfiguredExplorePopularLimit() {
+  const value = Number(process.env.EXPLORE_TOP_LIMIT ?? process.env.LEADERBOARD_TOP_LIMIT ?? DEFAULT_EXPLORE_POPULAR_LIMIT);
+  if (!Number.isFinite(value) || value <= 0) return DEFAULT_EXPLORE_POPULAR_LIMIT;
+  return Math.floor(value);
+}
+
+function getConfiguredExploreRefreshIntervalMs() {
+  const value = Number(
+    process.env.EXPLORE_REFRESH_INTERVAL_MS ??
+      process.env.LEADERBOARD_REFRESH_INTERVAL_MS ??
+      DEFAULT_EXPLORE_REFRESH_INTERVAL_MS
+  );
+  if (!Number.isFinite(value) || value <= 0) return DEFAULT_EXPLORE_REFRESH_INTERVAL_MS;
+  return Math.floor(value);
+}
 
 function ageInDays(dateValue: string | null | undefined): number | null {
   if (!dateValue) return null;
@@ -181,11 +199,8 @@ async function fetchPackageJson(owner: string, name: string): Promise<string | n
   });
 }
 
-function parseDependencies(packageJson: any) {
-  return {
-    dependencies: typeof packageJson.dependencies === "object" && packageJson.dependencies ? packageJson.dependencies : {},
-    devDependencies: typeof packageJson.devDependencies === "object" && packageJson.devDependencies ? packageJson.devDependencies : {},
-  };
+function parseDependencies(deps: unknown): Record<string, string> {
+  return typeof deps === "object" && deps !== null ? (deps as Record<string, string>) : {};
 }
 
 async function createOrUpdateLeaderboardItem(prisma: PrismaClient, repoData: any, category: string, rank: number) {
@@ -193,6 +208,7 @@ async function createOrUpdateLeaderboardItem(prisma: PrismaClient, repoData: any
     repoData.fullName ??
     repoData.nameWithOwner ??
     `${repoData.owner?.login ?? ""}/${repoData.name}`;
+  const ownerLogin = repoData.owner?.login ?? repoData.owner;
 
   const existing = await prisma.leaderboardRepository.findUnique({
     where: {
@@ -203,19 +219,30 @@ async function createOrUpdateLeaderboardItem(prisma: PrismaClient, repoData: any
     },
   });
 
-  const packageJsonText = await fetchPackageJson(repoData.owner, repoData.name);
+  const packageJsonText = await fetchPackageJson(ownerLogin, repoData.name);
   const packageJsonPresent = packageJsonText != null;
 
-  const score = packageJsonPresent ? await analyzeRepository(repoData.owner, repoData.name, packageJsonText) : null;
-  const analysisStatus = score?.result ? "COMPLETED" : packageJsonPresent ? "PENDING" : "UNKNOWN";
+  const shouldCreateAnalysis =
+    packageJsonPresent &&
+    packageJsonText != null &&
+    !existing?.analysisResultToken &&
+    !existing?.analysisId;
+
+  const score = shouldCreateAnalysis
+    ? await analyzeRepository(prisma, ownerLogin, repoData.name, packageJsonText)
+    : null;
+  const analysisStatus =
+    score?.analysisStatus ??
+    existing?.analysisStatus ??
+    (packageJsonPresent ? "UNKNOWN" : "UNKNOWN");
   const analysisScore = score?.result?.globalScore ?? null;
-  const analysisResultToken = score?.result?.resultToken ?? null;
-  const analysisId = score?.analysisId ?? null;
+  const analysisResultToken = score?.result?.resultToken ?? existing?.analysisResultToken ?? null;
+  const analysisId = score?.analysisId ?? existing?.analysisId ?? null;
 
   const { popularityScore, activityScore, compatibilityScore } = buildLeaderboardScore(repoData);
 
   const row = {
-    owner: repoData.owner?.login ?? repoData.owner,
+    owner: ownerLogin,
     name: repoData.name,
     fullName,
     url: repoData.url,
@@ -235,7 +262,7 @@ async function createOrUpdateLeaderboardItem(prisma: PrismaClient, repoData: any
     githubPopularityScore: popularityScore,
     githubActivityScore: activityScore,
     githubCompatibilityScore: compatibilityScore,
-    analysisScore,
+    analysisScore: analysisScore ?? existing?.analysisScore ?? null,
     analysisStatus,
     analysisResultToken,
     analysisId,
@@ -256,7 +283,7 @@ async function createOrUpdateLeaderboardItem(prisma: PrismaClient, repoData: any
   }
 }
 
-async function analyzeRepository(owner: string, name: string, packageJsonText: string) {
+async function analyzeRepository(prisma: PrismaClient, owner: string, name: string, packageJsonText: string) {
   let parsed;
   try {
     parsed = JSON.parse(packageJsonText);
@@ -281,44 +308,59 @@ async function analyzeRepository(owner: string, name: string, packageJsonText: s
     return null;
   }
 
-  const queue = new Queue<AnalysisJobData, void, "run-analysis">(ANALYSIS_QUEUE_NAME, {
-    connection: createRedisConnectionOptions(),
+  const analysis = await prisma.analysis.create({
+    data: {
+      status: AnalysisStatus.PENDING,
+      dependencies: {
+        create: dependencyRecords,
+      },
+    },
+    include: {
+      dependencies: true,
+    },
   });
 
-  const analysisId = `${owner}-${name}-${Date.now()}`;
-
-  await queue.add(
-    "run-analysis",
-    { analysisId },
-    { jobId: analysisId }
-  );
-
-  await queue.close();
+  await enqueueAnalysisJob({ analysisId: analysis.id, owner, repo: name });
 
   return {
-    analysisId,
+    analysisId: analysis.id,
+    analysisStatus: AnalysisStatus.PENDING,
     result: {
       globalScore: 0,
       riskLevel: "UNKNOWN",
       summary: "Analysis scheduled",
       dependencyScores: [],
-      resultToken: null,
+      resultToken: analysis.resultToken,
     },
   };
 }
 
 export async function refreshLeaderboardRepositories(prisma: PrismaClient) {
-  console.log("[worker] Starting leaderboard refresh scheduler");
-  await refreshOnce(prisma);
+  console.log("[worker] Starting explore refresh scheduler");
+  await runExploreRefresh(prisma);
 
-  const interval = 7 * 24 * 60 * 60 * 1000;
-  setInterval(() => void refreshOnce(prisma), interval);
+  const interval = getConfiguredExploreRefreshIntervalMs();
+  const timer = setInterval(() => {
+    void runExploreRefresh(prisma);
+  }, interval);
+  timer.unref();
+}
+
+async function runExploreRefresh(prisma: PrismaClient) {
+  try {
+    await refreshOnce(prisma);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[worker] Explore refresh failed: ${message}`);
+  }
 }
 
 async function refreshOnce(prisma: PrismaClient) {
-  console.log("[worker] Running leaderboard refresh job");
+  console.log("[worker] Running explore refresh job");
 
-  const popularRepos = await fetchRepositories("stars:>1000 sort:stars-desc", DEFAULT_GITHUB_SEARCH_LIMIT);
+  const popularLimit = getConfiguredExplorePopularLimit();
+
+  const popularRepos = await fetchRepositories("stars:>1000 sort:stars-desc", popularLimit);
   const activeRepos = await fetchRepositories(
     `pushed:>=${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)} sort:updated-desc`,
     DEFAULT_GITHUB_SEARCH_LIMIT
@@ -330,10 +372,10 @@ async function refreshOnce(prisma: PrismaClient) {
     .map((entry) => entry.repo);
 
   await Promise.all([
-    ...popularRepos.slice(0, 3).map((repo, index) => createOrUpdateLeaderboardItem(prisma, repo, "popular", index + 1)),
+    ...popularRepos.slice(0, popularLimit).map((repo, index) => createOrUpdateLeaderboardItem(prisma, repo, "popular", index + 1)),
     ...activeRepos.slice(0, 3).map((repo, index) => createOrUpdateLeaderboardItem(prisma, repo, "active", index + 1)),
     ...bestRankedRepos.slice(0, 3).map((repo, index) => createOrUpdateLeaderboardItem(prisma, repo, "bestRanked", index + 1)),
   ]);
 
-  console.log("[worker] Leaderboard refresh completed");
+  console.log("[worker] Explore refresh completed");
 }

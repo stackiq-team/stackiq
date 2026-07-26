@@ -83,6 +83,9 @@ type AnalysisRepository = {
     createMany(args: { data: DependencyScoreCreateData[] }): Promise<unknown>;
     upsert(args: any): Promise<unknown>;
   };
+  leaderboardRepository?: {
+    updateMany(args: any): Promise<unknown>;
+  };
   dependencyAnalysisCache?: any;
 };
 
@@ -262,7 +265,7 @@ export async function processAnalysisJob(
       `[worker] Analysis result saved: analysisId=${analysisId}, dependencyScores=${dependencyScores.length}`
     );
 
-    if (analysisId) {
+    if (analysisId && prisma.leaderboardRepository) {
       await prisma.leaderboardRepository.updateMany({
         where: { analysisId },
         data: {

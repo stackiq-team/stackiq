@@ -171,8 +171,14 @@ export async function fetchAnalysisByResultToken(
 
 export async function fetchLeaderboards(forceRefresh = false): Promise<LeaderboardsFetchResult> {
   try {
-    const query = forceRefresh ? "?forceRefresh=true" : "";
-    const response = await fetch(`${API_BASE_URL}/leaderboards${query}`);
+    const params = new URLSearchParams();
+
+    if (forceRefresh) {
+      params.set("forceRefresh", "true");
+    }
+
+    const query = params.toString();
+    const response = await fetch(`${API_BASE_URL}/leaderboards${query ? `?${query}` : ""}`);
 
     if (!response.ok) {
       throw new Error(`HTTP error ${response.status}`);

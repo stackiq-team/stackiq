@@ -232,6 +232,14 @@ async function fetchRepositories(query: string, first: number): Promise<RepoLead
   return data.search.nodes.map(parseRepositoryNode);
 }
 
+const DEFAULT_EXPLORE_POPULAR_LIMIT = 3;
+
+function getConfiguredPopularLimit() {
+  const value = Number(process.env.EXPLORE_TOP_LIMIT ?? process.env.LEADERBOARD_TOP_LIMIT ?? DEFAULT_EXPLORE_POPULAR_LIMIT);
+  if (!Number.isFinite(value) || value <= 0) return DEFAULT_EXPLORE_POPULAR_LIMIT;
+  return Math.floor(value);
+}
+
 async function fetchRepositoryPackageJson(owner: string, name: string): Promise<string | null> {
   try {
     const data = await fetchGitHub<{ repository: { object: { text?: string } | null } | null }>(
@@ -419,8 +427,16 @@ async function createOrUpdateLeaderboardItem(
   }
 }
 
-async function loadOrRefreshLeaderboards(forceRefresh = false): Promise<LeaderboardCachePayload> {
-  const existing = await getLeaderboardsFromDb();
+const DEFAULT_POPULAR_LIMIT = 3;
+
+function sanitizePopularLimit(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return DEFAULT_POPULAR_LIMIT;
+  return Math.floor(value);
+}
+
+async function loadOrRefreshLeaderboards(forceRefresh = false, popularLimit = getConfiguredPopularLimit()): Promise<LeaderboardCachePayload> {
+  const normalizedPopularLimit = sanitizePopularLimit(popularLimit);
+  const existing = await getLeaderboardsFromDb(normalizedPopularLimit);
   const hasResults =
     existing.leaderboards.popular.length > 0 ||
     existing.leaderboards.active.length > 0 ||
@@ -430,7 +446,7 @@ async function loadOrRefreshLeaderboards(forceRefresh = false): Promise<Leaderbo
     return existing;
   }
 
-  const popular = await fetchRepositories("stars:>1000 sort:stars-desc", 10);
+  const popular = await fetchRepositories("stars:>1000 sort:stars-desc", normalizedPopularLimit);
   const days30Ago = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
@@ -446,7 +462,7 @@ async function loadOrRefreshLeaderboards(forceRefresh = false): Promise<Leaderbo
 
   const analysisCache = new Map<string, RepositoryAnalysisInfo>();
   await Promise.all([
-    ...popular.slice(0, 3).map((repo, index) =>
+    ...popular.map((repo, index) =>
       createOrUpdateLeaderboardItem(repo, "popular", index + 1, analysisCache)
     ),
     ...active.slice(0, 3).map((repo, index) =>
@@ -457,12 +473,12 @@ async function loadOrRefreshLeaderboards(forceRefresh = false): Promise<Leaderbo
     ),
   ]);
 
-  return await getLeaderboardsFromDb();
+  return await getLeaderboardsFromDb(normalizedPopularLimit);
 }
 
-export async function getLeaderboards(forceRefresh = false): Promise<LeaderboardCachePayload> {
+export async function getLeaderboards(forceRefresh = false, popularLimit = getConfiguredPopularLimit()): Promise<LeaderboardCachePayload> {
   try {
-    return await loadOrRefreshLeaderboards(forceRefresh);
+    return await loadOrRefreshLeaderboards(forceRefresh, popularLimit);
   } catch (error) {
     throw new Error(`Failed to load leaderboards: ${error instanceof Error ? error.message : String(error)}`);
   }
