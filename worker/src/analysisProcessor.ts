@@ -20,6 +20,10 @@ import type { GitHubMinerInput, GitHubMinerOutput } from "./types/githubMinerTyp
 import type { IssuesMiningMetrics, IssuesMiningResult, IssueSummary } from "./types/issuesMining.types.js";
 import { DependencyAnalysisCacheManager } from "./cache/dependencyAnalysisCache.js";
 import { sendResultEmail } from "./adapters/email.adapter.js";
+import {
+  analyzeDependencyRelationships,
+  type DependencyRelationshipResult,
+} from "./dependencyRelationships.js";
 
 type AnalysisResultData = {
   globalScore: number;
@@ -82,6 +86,11 @@ type AnalysisRepository = {
     createMany(args: { data: DependencyScoreCreateData[] }): Promise<unknown>;
     upsert(args: any): Promise<unknown>;
   };
+  dependencyRelationship?: {
+    deleteMany(args: { where: { analysisId: string } }): Promise<unknown>;
+    upsert(args: any): Promise<unknown>;
+  };
+  dependencyRelationshipCache?: any;
   dependencyAnalysisCache?: any;
 };
 
@@ -152,6 +161,9 @@ export async function processAnalysisJob(
 
   try {
     logger.log(`[worker] Analysis processing started: analysisId=${analysisId}`);
+    logger.log(
+      `[worker] Analysis dependencies loaded: analysisId=${analysisId}, dependencies=${analysis.dependencies.length}`
+    );
 
     const processingResult = await prisma.analysisResult.upsert({
       where: { analysisId },
@@ -214,6 +226,16 @@ export async function processAnalysisJob(
         );
       },
     });
+    logger.log(
+      `[worker] Dependency enrichment complete: analysisId=${analysisId}, enrichedDependencies=${dependencies.length}`
+    );
+
+    const dependencyRelationships = await analyzeRelationshipsSafely({
+      prisma,
+      analysisId,
+      dependencies,
+      logger,
+    });
 
     const runAnalysisPayload: AnalysisJobData & { dependencies: EnrichedDependencyInput[] } = {
       analysisId,
@@ -222,6 +244,9 @@ export async function processAnalysisJob(
     };
 
     const result = await runAnalysis(runAnalysisPayload);
+    logger.log(
+      `[worker] Score aggregation complete: analysisId=${analysisId}, dependencyScores=${result.dependencyScores?.length ?? 0}`
+    );
 
     logger.log(
       `[worker] Saving analysis result: analysisId=${analysisId}, globalScore=${result.globalScore}, riskLevel=${result.riskLevel}`
@@ -254,6 +279,12 @@ export async function processAnalysisJob(
             enrichedDependency,
           });
         })
+      );
+    }
+
+    if (dependencyRelationships.length > 0) {
+      logger.log(
+        `[worker] Dependency relationships saved: analysisId=${analysisId}, relationships=${dependencyRelationships.length}`
       );
     }
 
@@ -557,6 +588,94 @@ async function enrichDependencies(args: {
   }
 
   return enrichedDependencies;
+}
+
+async function analyzeRelationshipsSafely(args: {
+  prisma: AnalysisRepository;
+  analysisId: string;
+  dependencies: EnrichedDependencyInput[];
+  logger: Pick<Console, "log" | "error">;
+}) {
+  if (!args.prisma.dependencyRelationship) {
+    args.logger.log("[worker] Dependency relationships unavailable: Prisma delegate not present.");
+    return [];
+  }
+
+  try {
+    args.logger.log(
+      `[worker] Dependency relationship analysis started: analysisId=${args.analysisId}, dependencies=${args.dependencies.length}`
+    );
+    const relationships = await analyzeDependencyRelationships({
+      analysisId: args.analysisId,
+      dependencies: args.dependencies,
+      logger: args.logger,
+      relationshipCache: args.prisma.dependencyRelationshipCache ?? null,
+    });
+    await saveDependencyRelationships({
+      prisma: args.prisma,
+      analysisId: args.analysisId,
+      relationships,
+    });
+    args.logger.log(
+      `[worker] Dependency relationship analysis finished: analysisId=${args.analysisId}, relationships=${relationships.length}`
+    );
+    return relationships;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown relationship analysis error";
+    args.logger.error(
+      `[worker] Dependency relationship analysis failed: analysisId=${args.analysisId}, error=${message}`
+    );
+    return [];
+  }
+}
+
+async function saveDependencyRelationships(args: {
+  prisma: AnalysisRepository;
+  analysisId: string;
+  relationships: DependencyRelationshipResult[];
+}) {
+  if (!args.prisma.dependencyRelationship) return;
+
+  await args.prisma.dependencyRelationship.deleteMany({
+    where: { analysisId: args.analysisId },
+  });
+  console.log(
+    `[worker] Existing dependency relationships cleared: analysisId=${args.analysisId}`
+  );
+
+  await Promise.all(
+    args.relationships.map((relationship) =>
+      args.prisma.dependencyRelationship!.upsert({
+        where: {
+          analysisId_sourceDependencyId_targetDependencyId: {
+            analysisId: relationship.analysisId,
+            sourceDependencyId: relationship.sourceDependencyId,
+            targetDependencyId: relationship.targetDependencyId,
+          },
+        },
+        create: {
+          analysisId: relationship.analysisId,
+          sourceDependencyId: relationship.sourceDependencyId,
+          targetDependencyId: relationship.targetDependencyId,
+          relationshipType: relationship.relationshipType,
+          confidence: relationship.confidence,
+          riskAdjustment: relationship.riskAdjustment,
+          summary: relationship.summary,
+          evidence: relationship.evidence,
+        },
+        update: {
+          relationshipType: relationship.relationshipType,
+          confidence: relationship.confidence,
+          riskAdjustment: relationship.riskAdjustment,
+          summary: relationship.summary,
+          evidence: relationship.evidence,
+        },
+      })
+    )
+  );
+  console.log(
+    `[worker] Dependency relationships persisted: analysisId=${args.analysisId}, relationships=${args.relationships.length}`
+  );
 }
 
 function createDefaultCacheManager(

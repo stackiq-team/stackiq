@@ -44,12 +44,17 @@ For local development, these values are enough:
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=stackiq
-POSTGRES_PORT=65432
+POSTGRES_PORT=55432
 DATABASE_URL=postgresql://postgres:postgres@db:5432/stackiq?schema=public
 REDIS_URL=redis://redis:6379
 BULLMQ_QUEUE_NAME=stackiq-analysis
 BACKEND_PORT=4000
 FRONTEND_PORT=5173
+WORKER_CONCURRENCY=2
+DEPENDENCY_RELATIONSHIPS_ENABLED=true
+DEPENDENCY_RELATIONSHIP_MAX_PAIRS=30
+DEPENDENCY_RELATIONSHIP_SEARCH_RESULTS=3
+DEPENDENCY_RELATIONSHIP_CACHE_TTL_DAYS=14
 ```
 
 Do not commit real passwords or production connection strings.

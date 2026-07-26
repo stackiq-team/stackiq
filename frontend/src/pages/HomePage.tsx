@@ -148,84 +148,140 @@ export default function JsonDropZone() {
   };
 
   return (
-    <div className="container">
-      <div className="emailSection">
-        <label className="emailLabel">Email Address (optional)</label>
-
-        <input
-          type="email"
-          value={email}
-          onChange={handleEmailChange}
-          placeholder="example@email.com"
-          className={`emailInput ${
-            emailError ? "inputError" : ""
-          }`}
-        />
-
-        {emailError && (
-          <div className="error">{emailError}</div>
-        )}
-      </div>
-
-      <div
-      className="dropZone"
-        style={{
-          borderColor: dragActive ? "#007bff" : "#999",
-          backgroundColor: dragActive ? "#eef5ff" : "#fafafa",
-        }}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-      >
-        <input
-          type="file"
-          accept=".json,application/json"
-          onChange={handleInputChange}
-          className="input"
-          id="json-upload"
-        />
-
-        <label className="label" htmlFor="json-upload">
-          Drag & drop a JSON file here
-          <br />
-          or click to browse
-        </label>
-      </div>
-
-      {fileName && (
-        <div className="success">
-          <strong>File loaded successfully:</strong> {fileName}
+    <section className="scanner-page">
+      <div className="scanner-hero">
+        <div>
+          <h1>Analyze a package stack before it becomes production risk.</h1>
+          <p className="hero-copy">
+            Upload or paste a package.json to score dependency health, mine issue signals,
+            and detect relationship risks between packages.
+          </p>
         </div>
-      )}
+        <div className="hero-metrics" aria-label="Analysis coverage">
+          <div>
+            <strong>GitHub</strong>
+            <span>repo signals</span>
+          </div>
+          <div>
+            <strong>NPM</strong>
+            <span>package metadata</span>
+          </div>
+          <div>
+            <strong>Issues</strong>
+            <span>risk evidence</span>
+          </div>
+        </div>
+      </div>
 
-      {error && <div className="error">{error}</div>}
+      <div className="scanner-grid">
+        <div className="scanner-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Input</p>
+              <h2>Package source</h2>
+            </div>
+            {fileName && <span className="file-pill">{fileName}</span>}
+          </div>
 
-      <textarea
-        className="jsonTextArea"
-        value={jsonText}
-        onChange={handleJsonTextChange}
-        placeholder="Paste your package.json content here, or upload a JSON file above."
-        spellCheck={false}
-      />
+          <div className="emailSection">
+            <label className="emailLabel">Email Address (optional)</label>
+            <p className="emailHelp">
+              Analysis can take a few minutes. Leave an email to get notified when the result is ready.
+            </p>
+            <input
+              type="email"
+              value={email}
+              onChange={handleEmailChange}
+              placeholder="example@email.com"
+              className={`emailInput ${emailError ? "inputError" : ""}`}
+            />
+            {emailError && <div className="error">{emailError}</div>}
+          </div>
 
-      <button
-        className="submitButton"
-        onClick={handleSubmit}
-        disabled={loading}
-      >
-        {loading ? "Sending..." : "Send File"}
-      </button>
+          <div
+            className={`dropZone ${dragActive ? "dropZoneActive" : ""}`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+          >
+            <input
+              type="file"
+              accept=".json,application/json"
+              onChange={handleInputChange}
+              className="input"
+              id="json-upload"
+            />
+            <label className="label" htmlFor="json-upload">
+              <span className="upload-icon">JSON</span>
+              <span>Drop package.json here or browse</span>
+            </label>
+          </div>
 
-      {resultUrl && (
-        <a
-          className="resultButton"
-          href={resultUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open Result Page
-        </a>
-      )}
-    </div>
+          {fileName && (
+            <div className="success">
+              Loaded {fileName}
+            </div>
+          )}
+            {error && <div className="error">{error}</div>}
+
+          <textarea
+            className="jsonTextArea"
+            value={jsonText}
+            onChange={handleJsonTextChange}
+            placeholder={`{\n  "dependencies": {\n    "express": "^5.2.1"\n  }\n}`}
+            spellCheck={false}
+          />
+
+          <div className="scanner-actions">
+            <button
+              className="submitButton"
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? "Analyzing..." : "Analyze Stack"}
+            </button>
+
+            {resultUrl && (
+              <a
+                className="resultButton"
+                href={resultUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open Result
+              </a>
+            )}
+          </div>
+        </div>
+
+        <aside className="home-output-panel">
+          <p className="eyebrow">Output</p>
+          <h2>What StackIQ checks</h2>
+          <div className="home-output-list">
+            <div className="home-output-item">
+              <span className="home-output-dot signal-blue"></span>
+              <div>
+                <strong>Dependency scores</strong>
+                <p>Popularity, maintenance, release age, repository health, and issue resolution signals.</p>
+              </div>
+            </div>
+            <div className="home-output-item">
+              <span className="home-output-dot signal-orange"></span>
+              <div>
+                <strong>Relationship risks</strong>
+                <p>Targeted issue searches for package pairs and evidence of conflicts or integration friction.</p>
+              </div>
+            </div>
+            <div className="home-output-item">
+              <span className="home-output-dot signal-green"></span>
+              <div>
+                <strong>Evidence links</strong>
+                <p>GitHub issue references behind warnings, so risk stays explainable.</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
   );
 }

@@ -9,9 +9,13 @@ import {
 } from "./queue/config.js";
 
 const connection = createRedisConnectionOptions();
+const workerConcurrency = 2;
 
 console.log(
-  `[worker] Booting worker: queue=${ANALYSIS_QUEUE_NAME}, concurrency=2`
+  `[worker] Booting worker: queue=${ANALYSIS_QUEUE_NAME}, concurrency=${workerConcurrency}, envWorkerConcurrency=${process.env.WORKER_CONCURRENCY ?? "unset"}`
+);
+console.log(
+  `[worker] Feature config: relationships=${process.env.DEPENDENCY_RELATIONSHIPS_ENABLED ?? "true"}, relationshipMaxPairs=${process.env.DEPENDENCY_RELATIONSHIP_MAX_PAIRS ?? "30"}, relationshipSearchResults=${process.env.DEPENDENCY_RELATIONSHIP_SEARCH_RESULTS ?? "3"}, relationshipCacheTtlDays=${process.env.DEPENDENCY_RELATIONSHIP_CACHE_TTL_DAYS ?? "14"}`
 );
 
 const worker = new Worker<AnalysisJobData>(
@@ -19,7 +23,7 @@ const worker = new Worker<AnalysisJobData>(
   async (job) => processAnalysisJob(job, { prisma }),
   {
     connection,
-    concurrency: 2,
+    concurrency: workerConcurrency,
   }
 );
 

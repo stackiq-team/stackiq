@@ -42,6 +42,7 @@ const { prismaMock, queueState } = vi.hoisted(() => {
 
   const prisma = {
     $queryRaw: vi.fn().mockResolvedValue([{ ok: 1 }]),
+    $executeRaw: vi.fn().mockResolvedValue(1),
     analysis: {
       create: vi.fn(async (args) => {
         const dependencies = args.data.dependencies.create.map(
@@ -213,7 +214,10 @@ describe("analysis flow", () => {
         status: "PENDING",
         resultToken: "result-token-1",
       });
-      expect(queueState.queuedJob).toEqual({ analysisId: "analysis-1" });
+      expect(queueState.queuedJob).toEqual({
+        analysisId: "analysis-1",
+        email: "test@example.com",
+      });
 
       await processAnalysisJob(
         {

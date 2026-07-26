@@ -30,6 +30,8 @@ model Dependency {
 
   analysis Analysis          @relation(fields: [analysisId], references: [id], onDelete: Cascade)
   scores   DependencyScore[]
+  sourceRelationships DependencyRelationship[] @relation("SourceDependencyRelationships")
+  targetRelationships DependencyRelationship[] @relation("TargetDependencyRelationships")
 
   @@unique([analysisId, name, type])
   @@index([analysisId])
@@ -47,6 +49,7 @@ model Analysis {
 
   dependencies Dependency[]
   result       AnalysisResult?
+  dependencyRelationships DependencyRelationship[]
 
   @@index([status])
   @@map("analyses")
@@ -91,6 +94,30 @@ model DependencyScore {
   @@map("dependency_scores")
 }
 
+model DependencyRelationship {
+  id                 String   @id @default(uuid()) @db.Uuid
+  analysisId         String   @map("analysis_id") @db.Uuid
+  sourceDependencyId String   @map("source_dependency_id") @db.Uuid
+  targetDependencyId String   @map("target_dependency_id") @db.Uuid
+  relationshipType   String   @map("relationship_type")
+  confidence         String
+  riskAdjustment     Int      @default(0) @map("risk_adjustment")
+  summary            String
+  evidence           Json?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  analysis         Analysis   @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  sourceDependency Dependency @relation("SourceDependencyRelationships", fields: [sourceDependencyId], references: [id], onDelete: Cascade)
+  targetDependency Dependency @relation("TargetDependencyRelationships", fields: [targetDependencyId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, sourceDependencyId, targetDependencyId], map: "dep_relationships_analysis_source_target_key")
+  @@index([analysisId])
+  @@index([sourceDependencyId])
+  @@index([targetDependencyId])
+  @@map("dependency_relationships")
+}
+
 model DependencyAnalysisCache {
   id                     String   @id @default(uuid()) @db.Uuid
   cacheKey               String   @unique @map("cache_key")
@@ -125,4 +152,29 @@ model DependencyAnalysisCache {
   @@index([repositoryFullName])
   @@index([expiresAt])
   @@map("dependency_analysis_cache")
+}
+
+model DependencyRelationshipCache {
+  id                       String   @id @default(uuid()) @db.Uuid
+  cacheKey                 String   @unique @map("cache_key")
+  sourceRepositoryFullName String   @map("source_repository_full_name")
+  sourcePackageName        String   @map("source_package_name")
+  targetPackageName        String   @map("target_package_name")
+  relationshipType         String   @map("relationship_type")
+  confidence               String
+  riskAdjustment           Int      @default(0) @map("risk_adjustment")
+  summary                  String
+  evidence                 Json?
+  searchTotalCount         Int      @default(0) @map("search_total_count")
+  searchResultCount        Int      @default(0) @map("search_result_count")
+  cacheVersion             String   @map("cache_version")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+  expiresAt                DateTime @map("expires_at")
+  lastAccessedAt           DateTime @default(now()) @map("last_accessed_at")
+
+  @@index([sourceRepositoryFullName])
+  @@index([targetPackageName])
+  @@index([expiresAt])
+  @@map("dependency_relationship_cache")
 }

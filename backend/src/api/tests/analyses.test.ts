@@ -289,6 +289,24 @@ describe("GET /analyses/:resultToken", () => {
             },
           },
         },
+        dependencyRelationships: {
+          include: {
+            sourceDependency: true,
+            targetDependency: true,
+          },
+          orderBy: [
+            {
+              sourceDependency: {
+                name: "asc",
+              },
+            },
+            {
+              targetDependency: {
+                name: "asc",
+              },
+            },
+          ],
+        },
       },
     });
   });

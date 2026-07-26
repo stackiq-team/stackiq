@@ -6,7 +6,9 @@ import "./DependencyDetailPage.css";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
+type DetailTab = "signals" | "score" | "relationships" | "issues";
 type ScoreEntry = NonNullable<AnalysisLookupResponse["analysis"]["result"]>["dependencyScores"][number];
+type RelationshipEntry = AnalysisLookupResponse["analysis"]["dependencyRelationships"][number];
 
 interface DependencyDetail {
   name: string;
@@ -15,6 +17,7 @@ interface DependencyDetail {
   score: number;
   riskLevel: RiskLevel;
   scoreEntry?: ScoreEntry;
+  relationships: RelationshipEntry[];
 }
 
 function riskClassName(risk: RiskLevel): string {
@@ -62,6 +65,79 @@ function formatBoolean(value: unknown) {
 
 function formatMetric(value: number | null | undefined) {
   return typeof value === "number" ? value.toLocaleString() : "-";
+}
+
+function formatScoreValue(value: number | null | undefined) {
+  return typeof value === "number" ? `${value}/100` : "Not available";
+}
+
+function weightedContribution(value: number | null | undefined, weight: number) {
+  return typeof value === "number" ? Math.round(value * weight) : null;
+}
+
+function getNumberValue(record: Record<string, unknown> | null, key: string) {
+  const value = record?.[key];
+  return typeof value === "number" ? value : null;
+}
+
+function formatPercentValue(value: unknown) {
+  return typeof value === "number" ? `${Math.round(value * 100)}%` : "-";
+}
+
+function scoreSignalLabel(value: number | null | undefined) {
+  if (typeof value !== "number") return "Not available";
+  if (value >= 80) return "Strong";
+  if (value >= 60) return "Good";
+  if (value >= 40) return "Weak";
+  return "Poor";
+}
+
+function scoreSignalClassName(value: number | null | undefined) {
+  if (typeof value !== "number") return "score-input-missing";
+  if (value >= 80) return "score-input-strong";
+  if (value >= 60) return "score-input-good";
+  if (value >= 40) return "score-input-weak";
+  return "score-input-poor";
+}
+
+function relationshipLabel(type: RelationshipEntry["relationshipType"]) {
+  if (type === "KNOWN_INCOMPATIBILITY") return "Known Incompatibility";
+  if (type === "POSSIBLE_CONFLICT") return "Possible Conflict";
+  if (type === "INTEGRATION_MENTION") return "Integration Mention";
+  return "Unknown";
+}
+
+function relationshipClassName(type: RelationshipEntry["relationshipType"]) {
+  if (type === "KNOWN_INCOMPATIBILITY") return "relationship-critical";
+  if (type === "POSSIBLE_CONFLICT") return "relationship-warning";
+  if (type === "INTEGRATION_MENTION") return "relationship-info";
+  return "relationship-muted";
+}
+
+function getRelationshipIssues(evidence: unknown) {
+  const record = getRecord(evidence);
+  const issues = record?.issues;
+  if (!Array.isArray(issues)) return [];
+
+  return issues.flatMap((issue) => {
+    const item = getRecord(issue);
+    if (!item) return [];
+    const issueNumber = typeof item.issueNumber === "number" ? item.issueNumber : null;
+    const title = getStringValue(item.title);
+    const url = getStringValue(item.url);
+    const matchedTerms = toStringArray(item.matchedTerms);
+
+    if (!issueNumber || !title || !url) return [];
+
+    return [
+      {
+        issueNumber,
+        title,
+        url,
+        matchedTerms,
+      },
+    ];
+  });
 }
 
 function getRepositoryUrl(score?: ScoreEntry) {
@@ -295,6 +371,7 @@ export default function DependencyDetailPage() {
   const [selectedActivityBucket, setSelectedActivityBucket] = useState<string | null>(null);
   const [selectedCloseReason, setSelectedCloseReason] = useState<string | null>(null);
   const [selectedPostCloseActivity, setSelectedPostCloseActivity] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<DetailTab>("signals");
 
   const load = async () => {
     if (!resultToken || !dependencyName) {
@@ -334,6 +411,9 @@ export default function DependencyDetailPage() {
         score: depScore.score,
         riskLevel: depScore.riskLevel,
         scoreEntry: depScore,
+        relationships: response.data.analysis.dependencyRelationships.filter(
+          (relationship) => relationship.sourceDependencyId === depScore.dependency.id
+        ),
       });
       setLoading(false);
     } catch (err) {
@@ -409,6 +489,7 @@ export default function DependencyDetailPage() {
   const repository = getRecord(githubMetrics?.repository);
   const npmMetrics = getRecord(githubMetrics?.npm);
   const issueMetrics = getRecord(dependency.scoreEntry?.issueMetrics);
+  const normalizedInputs = getRecord(dependency.scoreEntry?.normalizedInputs);
   const topics = toStringArray(githubMetrics?.topics);
   const languages = toStringArray(githubMetrics?.languages);
   const warnings = Array.isArray(dependency.scoreEntry?.warnings)
@@ -446,6 +527,69 @@ export default function DependencyDetailPage() {
 
   const timeToCloseStats = computeTimeToCloseStats(filteredIssueSummaries);
   const triageSpeedStats = computeTriageSpeedStats(filteredIssueSummaries);
+  const visibleRelationships = dependency.relationships.filter(
+    (relationship) => relationship.relationshipType !== "UNKNOWN"
+  );
+  const unknownRelationshipCount = dependency.relationships.length - visibleRelationships.length;
+  const relationshipCounts = visibleRelationships.reduce(
+    (counts, relationship) => {
+      if (relationship.relationshipType === "KNOWN_INCOMPATIBILITY") counts.known += 1;
+      if (relationship.relationshipType === "POSSIBLE_CONFLICT") counts.possible += 1;
+      if (relationship.relationshipType === "INTEGRATION_MENTION") counts.mentions += 1;
+      return counts;
+    },
+    { known: 0, possible: 0, mentions: 0 }
+  );
+  const scoreBreakdown = [
+    {
+      label: "Package health",
+      score: dependency.scoreEntry?.popularityScore ?? null,
+      weight: 0.5,
+      description: "NPM signals: downloads, release age, package age, versions, dependency count, license, repository, README.",
+      inputs: [
+        { label: "Weekly downloads", key: "weeklyDownloads", raw: formatMetric(typeof npmMetrics?.weeklyDownloads === "number" ? npmMetrics.weeklyDownloads : null) },
+        { label: "Latest publish age", key: "latestPublishAge", raw: `${formatMetric(typeof npmMetrics?.latestPublishAgeDays === "number" ? npmMetrics.latestPublishAgeDays : null)} days` },
+        { label: "Package age", key: "packageAge", raw: `${formatMetric(typeof npmMetrics?.packageAgeDays === "number" ? npmMetrics.packageAgeDays : null)} days` },
+        { label: "Version count", key: "versionCount", raw: formatMetric(typeof npmMetrics?.versionCount === "number" ? npmMetrics.versionCount : null) },
+        { label: "Dependency count", key: "dependencyCount", raw: formatMetric(typeof npmMetrics?.dependencyCount === "number" ? npmMetrics.dependencyCount : null) },
+        { label: "NPM license", key: "npmLicense", raw: formatBoolean(npmMetrics?.hasLicense) },
+        { label: "Repository metadata", key: "npmRepository", raw: formatBoolean(npmMetrics?.hasRepository) },
+        { label: "README", key: "npmReadme", raw: formatBoolean(npmMetrics?.hasReadme) },
+      ],
+    },
+    {
+      label: "Repository health",
+      score: dependency.scoreEntry?.maintenanceScore ?? null,
+      weight: 0.3,
+      description: "GitHub signals: stars, forks, watchers, contributors, project age, pull requests, and repository license.",
+      inputs: [
+        { label: "Stars", key: "stars", raw: formatMetric(typeof githubMetrics?.stars === "number" ? githubMetrics.stars : null) },
+        { label: "Forks", key: "forks", raw: formatMetric(typeof githubMetrics?.forks === "number" ? githubMetrics.forks : null) },
+        { label: "Watchers", key: "watchers", raw: formatMetric(typeof githubMetrics?.watchers === "number" ? githubMetrics.watchers : null) },
+        { label: "Contributors", key: "contributors", raw: formatMetric(typeof githubMetrics?.contributors === "number" ? githubMetrics.contributors : null) },
+        { label: "Project age", key: "projectAge", raw: `${formatMetric(typeof githubMetrics?.projectAgeDays === "number" ? githubMetrics.projectAgeDays : null)} days` },
+        { label: "Pull requests", key: "pullRequests", raw: formatMetric(typeof githubMetrics?.pullRequests === "number" ? githubMetrics.pullRequests : null) },
+        { label: "GitHub license", key: "githubLicense", raw: getStringValue(githubMetrics?.license) ?? "-" },
+      ],
+    },
+    {
+      label: "Issue resolution",
+      score: dependency.scoreEntry?.resolutionQualityScore ?? null,
+      weight: 0.2,
+      description: "Sampled issue-mining signals: resolution time, first response, closure rate, PR closures, and post-close activity.",
+      inputs: [
+        { label: "Resolution time", key: "resolutionTime", raw: `${formatMetric(typeof issueMetrics?.averageResolutionTimeDays === "number" ? issueMetrics.averageResolutionTimeDays : null)} days avg` },
+        { label: "First response time", key: "firstResponseTime", raw: `${formatMetric(typeof issueMetrics?.averageFirstResponseTimeDays === "number" ? issueMetrics.averageFirstResponseTimeDays : null)} days avg` },
+        { label: "Closure rate", key: "closureRate", raw: formatPercentValue(issueMetrics?.closureRate) },
+        { label: "No-response rate", key: "noResponseRate", raw: formatPercentValue(issueMetrics?.noResponseRate) },
+        { label: "Closed by PR rate", key: "closedByPrRate", raw: formatPercentValue(issueMetrics?.closedByPrRate ?? issueMetrics?.closedByPRRate) },
+        { label: "Code resolution rate", key: "codeResolutionRate", raw: formatPercentValue(issueMetrics?.codeResolutionRate) },
+        { label: "Post-close activity", key: "postCloseActivityRate", raw: formatPercentValue(issueMetrics?.postCloseActivityRate) },
+      ],
+    },
+  ];
+  const relationshipSignalCount =
+    relationshipCounts.known + relationshipCounts.possible + relationshipCounts.mentions;
 
   return (
     <section className="dependency-detail-page">
@@ -602,108 +746,335 @@ export default function DependencyDetailPage() {
         </div>
       )}
 
-      <article className="github-section">
-        <h2>Full Data Snapshot</h2>
-        <div className="github-metrics">
-          <div className="metric-placeholder">
-            <p>Dependency Overview</p>
-            <div className="github-metric-value">Dependency ID: {dependency.scoreEntry?.dependency.id ?? "-"}</div>
-            <div className="github-metric-value">Package Name: {dependency.name}</div>
-            <div className="github-metric-value">Version Requirement: {dependency.versionRequirement}</div>
-            <div className="github-metric-value">Type: {dependency.type === "DEPENDENCY" ? "Dependency" : "Dev Dependency"}</div>
-            <div className="github-metric-value">Repository Match Source: {getStringValue(githubMetrics?.repositoryMatchSource) ?? "-"}</div>
-            <div className="github-metric-value">Repository Match Confidence: {getStringValue(githubMetrics?.repositoryMatchConfidence) ?? "-"}</div>
-          </div>
+      <div className="detail-tabs" role="tablist" aria-label="Dependency detail views">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "signals"}
+          className={`detail-tab ${activeTab === "signals" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("signals")}
+        >
+          Signals
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "score"}
+          className={`detail-tab ${activeTab === "score" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("score")}
+        >
+          Score Breakdown
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "relationships"}
+          className={`detail-tab ${activeTab === "relationships" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("relationships")}
+        >
+          Relationships
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "issues"}
+          className={`detail-tab ${activeTab === "issues" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("issues")}
+        >
+          Issues
+        </button>
+      </div>
 
-          <div className="metric-placeholder">
-            <p>Repository Details</p>
-            <div className="github-metric-value">
-              Repository: {getRepositoryUrl(dependency.scoreEntry) ? (
+      {activeTab === "relationships" && (
+      <article className="github-section">
+        <h2>Dependency Relationships</h2>
+        <div className="relationship-summary-grid">
+          <div className="relationship-summary-card relationship-summary-critical">
+            <span>Known incompatibilities</span>
+            <strong>{relationshipCounts.known}</strong>
+          </div>
+          <div className="relationship-summary-card relationship-summary-warning">
+            <span>Possible conflicts</span>
+            <strong>{relationshipCounts.possible}</strong>
+          </div>
+          <div className="relationship-summary-card relationship-summary-info">
+            <span>Integration mentions</span>
+            <strong>{relationshipCounts.mentions}</strong>
+          </div>
+          <div className="relationship-summary-card">
+            <span>No evidence found</span>
+            <strong>{unknownRelationshipCount}</strong>
+          </div>
+        </div>
+        {unknownRelationshipCount > 0 && (
+          <p className="relationship-muted-note">
+            {unknownRelationshipCount} checked dependencies had no issue evidence for this package.
+          </p>
+        )}
+        {visibleRelationships.length > 0 ? (
+          <div className="relationship-list">
+            {visibleRelationships.map((relationship) => {
+              const issues = getRelationshipIssues(relationship.evidence);
+
+              return (
+                <div className="relationship-item" key={relationship.id}>
+                  <div className="relationship-header">
+                    <div>
+                      <p className="relationship-target">{relationship.targetDependency.name}</p>
+                      <p className="relationship-summary">{relationship.summary}</p>
+                    </div>
+                    <span className={`relationship-badge ${relationshipClassName(relationship.relationshipType)}`}>
+                      {relationshipLabel(relationship.relationshipType)}
+                    </span>
+                  </div>
+
+                  <div className="relationship-meta">
+                    <span>Confidence: {relationship.confidence}</span>
+                    <span>Score adjustment: {relationship.riskAdjustment}</span>
+                  </div>
+
+                  {issues.length > 0 ? (
+                    <ul className="relationship-evidence">
+                      {issues.slice(0, 3).map((issue) => (
+                        <li key={issue.url}>
+                          <a href={issue.url} target="_blank" rel="noreferrer">
+                            #{issue.issueNumber} {issue.title}
+                          </a>
+                          {issue.matchedTerms.length > 0 && (
+                            <span> Terms: {issue.matchedTerms.join(", ")}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="github-metric-value">No issue evidence links found.</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="github-metric-value">
+            No relationship risks or integration mentions were found for this dependency.
+          </div>
+        )}
+      </article>
+      )}
+
+      {activeTab === "signals" && (
+      <article className="github-section">
+        <div className="section-heading">
+          <div>
+            <h2>Dependency Signals</h2>
+            <p>Repository, package, and issue signals used to understand this dependency.</p>
+          </div>
+        </div>
+
+        <div className="signal-stat-grid">
+          <div className="signal-stat-card">
+            <span>Weekly downloads</span>
+            <strong>{formatMetric(typeof npmMetrics?.weeklyDownloads === "number" ? npmMetrics.weeklyDownloads : null)}</strong>
+          </div>
+          <div className="signal-stat-card">
+            <span>Stars</span>
+            <strong>{formatMetric(typeof githubMetrics?.stars === "number" ? githubMetrics.stars : null)}</strong>
+          </div>
+          <div className="signal-stat-card">
+            <span>Repository issues</span>
+            <strong>{formatMetric(typeof githubMetrics?.issues === "number" ? githubMetrics.issues : null)}</strong>
+          </div>
+          <div className="signal-stat-card">
+            <span>Latest publish age</span>
+            <strong>{formatMetric(typeof npmMetrics?.latestPublishAgeDays === "number" ? npmMetrics.latestPublishAgeDays : null)} days</strong>
+          </div>
+        </div>
+
+        <div className="signals-layout">
+          <div className="signal-panel signal-panel-wide">
+            <div className="signal-panel-header">
+              <p>Repository</p>
+              {getRepositoryUrl(dependency.scoreEntry) && (
                 <a href={getRepositoryUrl(dependency.scoreEntry) ?? "#"} target="_blank" rel="noreferrer">
-                  {getRepositoryUrl(dependency.scoreEntry)}
+                  Open repo
                 </a>
-              ) : (
-                "-"
               )}
             </div>
-            <div className="github-metric-value">Owner: {getStringValue(repository?.owner) ?? "-"}</div>
-            <div className="github-metric-value">Name: {getStringValue(repository?.name) ?? "-"}</div>
-            <div className="github-metric-value">Full Name: {getStringValue(repository?.fullName) ?? "-"}</div>
-            <div className="github-metric-value">Description: {getStringValue(repository?.description) ?? "-"}</div>
-            <div className="github-metric-value">Repository Created At: {formatDate(repository?.createdAt)}</div>
-            <div className="github-metric-value">Created At: {formatDate(githubMetrics?.createdAt)}</div>
-            <div className="github-metric-value">Raw Created At: {formatDate(githubMetrics?.created_at)}</div>
+            <div className="repository-identity">
+              <strong>{getStringValue(repository?.fullName) ?? getStringValue(repository?.name) ?? "-"}</strong>
+              <span>{getStringValue(githubMetrics?.primaryLanguage) ?? "Unknown language"}</span>
+            </div>
+            <p className="signal-description">{getStringValue(repository?.description) ?? "No repository description available."}</p>
+            <dl className="signal-definition-grid">
+              <div>
+                <dt>Owner</dt>
+                <dd>{getStringValue(repository?.owner) ?? "-"}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{formatDate(repository?.createdAt)}</dd>
+              </div>
+              <div>
+                <dt>Project age</dt>
+                <dd>{formatMetric(typeof githubMetrics?.projectAgeDays === "number" ? githubMetrics.projectAgeDays : null)} days</dd>
+              </div>
+            </dl>
+            <div className="signal-mini-metrics">
+              <div><span>Watchers</span><strong>{formatMetric(typeof githubMetrics?.watchers === "number" ? githubMetrics.watchers : null)}</strong></div>
+              <div><span>Forks</span><strong>{formatMetric(typeof githubMetrics?.forks === "number" ? githubMetrics.forks : null)}</strong></div>
+              <div><span>Pull requests</span><strong>{formatMetric(typeof githubMetrics?.pullRequests === "number" ? githubMetrics.pullRequests : null)}</strong></div>
+              <div><span>Contributors</span><strong>{formatMetric(typeof githubMetrics?.contributors === "number" ? githubMetrics.contributors : null)}</strong></div>
+            </div>
           </div>
 
-          <div className="metric-placeholder">
-            <p>Repository Stats</p>
-            <div className="github-metric-value">Stars: {formatMetric(typeof githubMetrics?.stars === "number" ? githubMetrics.stars : null)}</div>
-            <div className="github-metric-value">Watchers: {formatMetric(typeof githubMetrics?.watchers === "number" ? githubMetrics.watchers : null)}</div>
-            <div className="github-metric-value">Forks: {formatMetric(typeof githubMetrics?.forks === "number" ? githubMetrics.forks : null)}</div>
-            <div className="github-metric-value">Issues: {formatMetric(typeof githubMetrics?.issues === "number" ? githubMetrics.issues : null)}</div>
-            <div className="github-metric-value">Pull Requests: {formatMetric(typeof githubMetrics?.pullRequests === "number" ? githubMetrics.pullRequests : null)}</div>
-            <div className="github-metric-value">Contributors: {formatMetric(typeof githubMetrics?.contributors === "number" ? githubMetrics.contributors : null)}</div>
-            <div className="github-metric-value">Project Age (days): {formatMetric(typeof githubMetrics?.projectAgeDays === "number" ? githubMetrics.projectAgeDays : null)}</div>
-            <div className="github-metric-value">Primary Language: {getStringValue(githubMetrics?.primaryLanguage) ?? "-"}</div>
+          <div className="signal-panel signal-panel-side">
+            <div className="signal-panel-header">
+              <p>Package health</p>
+            </div>
+            <dl className="signal-list">
+              <div><dt>README</dt><dd>{formatBoolean(npmMetrics?.hasReadme)}</dd></div>
+              <div><dt>License</dt><dd>{getStringValue(githubMetrics?.license) ?? formatBoolean(npmMetrics?.hasLicense)}</dd></div>
+              <div><dt>Repository field</dt><dd>{formatBoolean(npmMetrics?.hasRepository)}</dd></div>
+              <div><dt>Versions</dt><dd>{formatMetric(typeof npmMetrics?.versionCount === "number" ? npmMetrics.versionCount : null)}</dd></div>
+              <div><dt>Package age</dt><dd>{formatMetric(typeof npmMetrics?.packageAgeDays === "number" ? npmMetrics.packageAgeDays : null)} days</dd></div>
+              <div><dt>Dependencies</dt><dd>{formatMetric(typeof npmMetrics?.dependencyCount === "number" ? npmMetrics.dependencyCount : null)}</dd></div>
+              <div><dt>Dev dependencies</dt><dd>{formatMetric(typeof npmMetrics?.devDependencyCount === "number" ? npmMetrics.devDependencyCount : null)}</dd></div>
+            </dl>
           </div>
 
-          <div className="metric-placeholder">
-            <p>Package Metadata</p>
-            <div className="github-metric-value">Has README: {formatBoolean(npmMetrics?.hasReadme)}</div>
-            <div className="github-metric-value">Has License: {formatBoolean(npmMetrics?.hasLicense)}</div>
-            <div className="github-metric-value">Has Repository: {formatBoolean(npmMetrics?.hasRepository)}</div>
-            <div className="github-metric-value">Version Count: {formatMetric(typeof npmMetrics?.versionCount === "number" ? npmMetrics.versionCount : null)}</div>
-            <div className="github-metric-value">Package Age (days): {formatMetric(typeof npmMetrics?.packageAgeDays === "number" ? npmMetrics.packageAgeDays : null)}</div>
-            <div className="github-metric-value">Dependency Count: {formatMetric(typeof npmMetrics?.dependencyCount === "number" ? npmMetrics.dependencyCount : null)}</div>
-            <div className="github-metric-value">Weekly Downloads: {formatMetric(typeof npmMetrics?.weeklyDownloads === "number" ? npmMetrics.weeklyDownloads : null)}</div>
-            <div className="github-metric-value">Dev Dependency Count: {formatMetric(typeof npmMetrics?.devDependencyCount === "number" ? npmMetrics.devDependencyCount : null)}</div>
-            <div className="github-metric-value">Latest Publish Age (days): {formatMetric(typeof npmMetrics?.latestPublishAgeDays === "number" ? npmMetrics.latestPublishAgeDays : null)}</div>
-            <div className="github-metric-value">NPM License: {getStringValue(githubMetrics?.license) ?? "-"}</div>
+          <div className="signal-panel signal-panel-tags">
+            <div className="signal-panel-header">
+              <p>Ecosystem tags</p>
+            </div>
+            <div className="signal-chip-group-label">Topics</div>
+            <div className="signal-chip-list">
+              {topics.length > 0 ? topics.map((topic) => (
+                <span className="signal-chip" key={topic}>{topic}</span>
+              )) : <span className="signal-empty">No topics found</span>}
+            </div>
+            <div className="signal-chip-group-label">Languages</div>
+            <div className="signal-chip-list">
+              {languages.length > 0 ? languages.map((language) => (
+                <span className="signal-chip" key={language}>{language}</span>
+              )) : <span className="signal-empty">No languages found</span>}
+            </div>
           </div>
 
-          <div className="metric-placeholder">
-            <p>Topics and Languages</p>
-            <div className="github-metric-value">Topics:</div>
-            {topics.length > 0 ? (
-              <ul className="warning-list">
-                {topics.map((topic) => (
-                  <li key={topic}>{topic}</li>
-                ))}
-              </ul>
-            ) : (
-              <div className="github-metric-value">-</div>
-            )}
-            <div className="github-metric-value">Languages:</div>
-            {languages.length > 0 ? (
-              <ul className="warning-list">
-                {languages.map((language) => (
-                  <li key={language}>{language}</li>
-                ))}
-              </ul>
-            ) : (
-              <div className="github-metric-value">-</div>
-            )}
-          </div>
-
-          <div className="metric-placeholder">
-            <p>Issue Metrics and Warnings</p>
-            <div className="github-metric-value">Open Issues: {formatMetric(typeof issueMetrics?.openIssues === "number" ? issueMetrics.openIssues : null)}</div>
-            <div className="github-metric-value">Closed Issues: {formatMetric(typeof issueMetrics?.closedIssues === "number" ? issueMetrics.closedIssues : null)}</div>
-            <div className="github-metric-value">Warnings:</div>
+          <div className="signal-panel signal-panel-issue">
+            <div className="signal-panel-header">
+              <p>Sampled issue window</p>
+            </div>
+            <p className="signal-description">
+              These numbers come from the issue-mining sample, not the repository lifetime totals.
+              The miner checks the configured recent lookback window and caps collection at 30 open and 70 closed issues.
+            </p>
+            <dl className="signal-list">
+              <div><dt>Sampled open issues</dt><dd>{formatMetric(typeof issueMetrics?.openIssues === "number" ? issueMetrics.openIssues : null)}</dd></div>
+              <div><dt>Sampled closed issues</dt><dd>{formatMetric(typeof issueMetrics?.closedIssues === "number" ? issueMetrics.closedIssues : null)}</dd></div>
+              <div><dt>Warnings</dt><dd>{warnings.length}</dd></div>
+            </dl>
             {warnings.length > 0 ? (
-              <ul className="warning-list">
+              <ul className="signal-warning-list">
                 {warnings.map((warning) => (
                   <li key={warning}>{warning}</li>
                 ))}
               </ul>
             ) : (
-              <div className="github-metric-value">No warnings reported</div>
+              <p className="signal-empty">No warnings reported</p>
             )}
           </div>
-
         </div>
       </article>
+      )}
 
+      {activeTab === "score" && (
+      <article className="github-section">
+        <div className="section-heading">
+          <div>
+            <h2>Score Breakdown</h2>
+            <p>How this dependency score is built from package, repository, and sampled issue signals.</p>
+          </div>
+        </div>
+
+        <div className="score-breakdown-hero">
+          <div>
+            <span>Overall dependency score</span>
+            <strong>{dependency.score}/100</strong>
+          </div>
+          <div>
+            <span>Risk level</span>
+            <strong className={riskClassName(dependency.riskLevel)}>{riskLabel(dependency.riskLevel)}</strong>
+          </div>
+        </div>
+
+        <div className="score-breakdown-list">
+          {scoreBreakdown.map((item) => {
+            const contribution = weightedContribution(item.score, item.weight);
+            const barWidth = typeof item.score === "number" ? item.score : 0;
+
+            return (
+              <article className="score-breakdown-item" key={item.label}>
+                <div className="score-breakdown-header">
+                  <div>
+                    <h3>{item.label}</h3>
+                    <p>{item.description}</p>
+                  </div>
+                  <div className="score-breakdown-value">
+                    <strong>{formatScoreValue(item.score)}</strong>
+                    <span>{Math.round(item.weight * 100)}% weight</span>
+                  </div>
+                </div>
+                <div className="score-breakdown-bar" aria-hidden="true">
+                  <div style={{ width: `${barWidth}%` }}></div>
+                </div>
+                <div className="score-breakdown-footer">
+                  <span>Contribution: {contribution ?? "-"} points</span>
+                </div>
+                <details className="score-input-details">
+                  <summary>Show scoring inputs</summary>
+                  <div className="score-input-grid">
+                    {item.inputs.map((input) => {
+                      const normalizedValue = getNumberValue(normalizedInputs, input.key);
+
+                      return (
+                        <div className="score-input-row" key={input.key}>
+                          <div>
+                            <strong>{input.label}</strong>
+                            <span>{input.raw}</span>
+                          </div>
+                          <span className={`score-input-signal ${scoreSignalClassName(normalizedValue)}`}>
+                            {scoreSignalLabel(normalizedValue)}
+                          </span>
+                          <span className="score-input-score">
+                            {typeof normalizedValue === "number" ? `${normalizedValue}/100` : "-"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              </article>
+            );
+          })}
+        </div>
+
+        <article className="score-relationship-note">
+          <div>
+            <h3>Relationship signals</h3>
+            <p>
+              Relationship analysis is shown separately. It is not currently included in the computed dependency score.
+            </p>
+          </div>
+          <div className="score-relationship-counts">
+            <span>{relationshipCounts.known} known</span>
+            <span>{relationshipCounts.possible} possible</span>
+            <span>{relationshipCounts.mentions} mentions</span>
+            <span>{relationshipSignalCount} total</span>
+          </div>
+        </article>
+      </article>
+      )}
+
+      {activeTab === "issues" && (
       <article className="github-section">
         <h2>
           Issue Activity <a href="#issue-activity-note" className="footnote-link">*</a>
@@ -953,6 +1324,7 @@ export default function DependencyDetailPage() {
 
         </div>
       </article>
+      )}
 
     </section>
   );

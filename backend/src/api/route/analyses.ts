@@ -46,6 +46,16 @@ router.get("/:resultToken", async (req: Request, res: Response) => {
             },
           },
         },
+        dependencyRelationships: {
+          include: {
+            sourceDependency: true,
+            targetDependency: true,
+          },
+          orderBy: [
+            { sourceDependency: { name: "asc" } },
+            { targetDependency: { name: "asc" } },
+          ],
+        },
       },
     });
 
