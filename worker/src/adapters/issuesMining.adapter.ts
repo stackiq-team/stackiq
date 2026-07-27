@@ -9,7 +9,9 @@ const nullMetrics: IssuesMiningMetrics = {
   recentActivityCount: null,
   averageResolutionTimeHours: null,
   averageResolutionTimeDays: null,
+  medianResolutionTimeDays: null,
   averageFirstResponseTimeDays: null,
+  medianFirstResponseTimeDays: null,
   firstResponseTimeHours: null,
   closureRate: null,
   noResponseRate: null,
@@ -21,6 +23,12 @@ const nullMetrics: IssuesMiningMetrics = {
   openToAssignedTimeHours: null,
   mergedPRRate: null,
   uncodedCloseRate: null,
+  healthyClosureRate: null,
+  staleOpenIssueRate: null,
+  sampleRecentOpenIssues: null,
+  sampleRecentClosedIssues: null,
+  sampleOlderClosedIssues: null,
+  sampleOldOpenIssues: null,
 };
 
 function hoursToDays(hours: number | null | undefined) {
@@ -48,9 +56,15 @@ export async function runIssuesMining(
       recentActivityCount: result.classifications?.recentActivityCount ?? null,
       averageResolutionTimeHours: result.classifications?.averageResolutionTimeHours ?? null,
       averageResolutionTimeDays: hoursToDays(result.classifications?.averageResolutionTimeHours),
+      medianResolutionTimeDays:
+        result.classifications?.medianResolutionTimeDays ??
+        hoursToDays(result.classifications?.medianResolutionTimeHours),
       averageFirstResponseTimeDays: hoursToDays(
         result.classifications?.firstResponseTimeHours ?? result.classifications?.openToAssignedTimeHours
       ),
+      medianFirstResponseTimeDays:
+        result.classifications?.medianFirstResponseTimeDays ??
+        hoursToDays(result.classifications?.medianFirstResponseTimeHours),
       firstResponseTimeHours:
         result.classifications?.firstResponseTimeHours ??
         result.classifications?.openToAssignedTimeHours ??
@@ -75,6 +89,12 @@ export async function runIssuesMining(
       openToAssignedTimeHours: result.classifications?.openToAssignedTimeHours ?? null,
       mergedPRRate: result.classifications?.mergedPRRate ?? null,
       uncodedCloseRate: result.classifications?.uncodedCloseRate ?? null,
+      healthyClosureRate: result.classifications?.healthyClosureRate ?? null,
+      staleOpenIssueRate: result.classifications?.staleOpenIssueRate ?? null,
+      sampleRecentOpenIssues: result.classifications?.sampleRecentOpenIssues ?? null,
+      sampleRecentClosedIssues: result.classifications?.sampleRecentClosedIssues ?? null,
+      sampleOlderClosedIssues: result.classifications?.sampleOlderClosedIssues ?? null,
+      sampleOldOpenIssues: result.classifications?.sampleOldOpenIssues ?? null,
     };
 
     return {

@@ -888,6 +888,49 @@
 	margin-bottom: 14px;
 }
 
+.relationship-section-heading {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 16px;
+}
+
+.relationship-section-heading h2 {
+	margin-bottom: 4px;
+}
+
+.relationship-section-heading p {
+	margin: 0;
+	color: var(--muted);
+	font-size: 13px;
+}
+
+.relationship-status-badge {
+	flex: 0 0 auto;
+	padding: 6px 10px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 800;
+	text-transform: uppercase;
+}
+
+.relationship-status-completed {
+	background: #dcfce7;
+	color: #166534;
+}
+
+.relationship-status-running,
+.relationship-status-waiting {
+	background: #fef3c7;
+	color: #92400e;
+}
+
+.relationship-status-failed {
+	background: #fee2e2;
+	color: #991b1b;
+}
+
 .relationship-summary-card {
 	display: flex;
 	align-items: center;
@@ -941,6 +984,17 @@
 	font-size: 13px;
 }
 
+.relationship-status-note {
+	margin: 0 0 12px;
+	padding: 10px 12px;
+	border: 1px solid #fde68a;
+	border-radius: 8px;
+	background: #fffbeb;
+	color: #92400e;
+	font-size: 13px;
+	font-weight: 700;
+}
+
 .relationship-header {
 	display: flex;
 	align-items: flex-start;
@@ -990,15 +1044,6 @@
 
 .relationship-muted {
 	background: #e2e8f0;
-	color: #475569;
-}
-
-.relationship-meta {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 10px;
-	margin-bottom: 10px;
-	font-size: 12px;
 	color: #475569;
 }
 

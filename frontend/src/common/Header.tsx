@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 export function Header() {
     const navigate = useNavigate();
     const location = useLocation();
-    const isResultPage = location.pathname.startsWith('/results');
 
     return (
         <header className="navbar">
@@ -15,7 +14,6 @@ export function Header() {
             </button>
             <nav className="nav-links">
                 <button className={location.pathname === '/' ? 'active' : ''} onClick={() => navigate('/')}>Analyze</button>
-                {isResultPage && <span className="nav-context">Dependency intelligence</span>}
                 <button className={location.pathname.startsWith('/explore') || location.pathname === '/leaderboard' ? 'active' : ''} onClick={() => navigate('/explore')}>Explore</button>
             </nav>
             </div>

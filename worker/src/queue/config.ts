@@ -3,6 +3,7 @@ export type AnalysisJobData = {
   email?: string | null;
   owner?: string;
   repo?: string;
+  source?: "USER_UPLOAD" | "USER_REPOSITORY" | "EXPLORE_REFRESH" | "WEEKLY_REFRESH";
 };
 
 export const ANALYSIS_QUEUE_NAME =

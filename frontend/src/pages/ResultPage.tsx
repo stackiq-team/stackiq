@@ -100,6 +100,24 @@ function countRelationshipRisks(relationships: RelationshipEntry[]) {
   };
 }
 
+function relationshipSummaryLabel(
+  counts: ReturnType<typeof countRelationshipRisks>,
+  analysisStatus: AnalysisStatus,
+  relationshipCount: number
+) {
+  if (analysisStatus !== "COMPLETED") return "Analysis pending";
+  if (relationshipCount === 0) return "Not checked yet";
+
+  const riskCount = counts.known + counts.possible;
+  const signalCount = riskCount + counts.mentions;
+
+  if (signalCount === 0) return "No signals found";
+  if (riskCount > 0) {
+    return `${riskCount} ${riskCount === 1 ? "risk" : "risks"} found`;
+  }
+  return `${counts.mentions} ${counts.mentions === 1 ? "mention" : "mentions"} found`;
+}
+
 function formatMetric(value: number | null | undefined) {
   return typeof value === "number" ? value.toLocaleString() : "-";
 }
@@ -185,11 +203,10 @@ function DependencyTable({
             const score = scoresByDependencyId.get(dependency.id);
             const repositoryUrl = getRepositoryUrl(score);
             const githubMetrics = getGithubMetrics(score);
-            const relationshipCounts = countRelationshipRisks(
-              analysis.dependencyRelationships.filter(
-                (relationship) => relationship.sourceDependencyId === dependency.id
-              )
+            const dependencyRelationships = analysis.dependencyRelationships.filter(
+              (relationship) => relationship.sourceDependencyId === dependency.id
             );
+            const relationshipCounts = countRelationshipRisks(dependencyRelationships);
             const isExpanded = Boolean(expandedDependencies[dependency.id]);
             const viewMoreLink = `/results/${analysis.resultToken}/dependency/${encodeURIComponent(dependency.name)}`;
 
@@ -265,7 +282,11 @@ function DependencyTable({
                           <div className="strip-group strip-group-wide">
                             <span>Relationships</span>
                             <strong>
-                              {relationshipCounts.known} known · {relationshipCounts.possible} possible · {relationshipCounts.mentions} mentions
+                              {relationshipSummaryLabel(
+                                relationshipCounts,
+                                analysis.status,
+                                dependencyRelationships.length
+                              )}
                             </strong>
                           </div>
                           <div className="strip-group strip-group-wide">

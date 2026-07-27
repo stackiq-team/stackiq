@@ -43,6 +43,9 @@ export type NormalizedInputs = {
   noResponseRate: number | null;
   closedByPrRate: number | null;
   codeResolutionRate: number | null;
+  healthyClosureRate: number | null;
+  staleOpenIssueRate: number | null;
+  sampleSize: number | null;
   postCloseActivityRate: number | null;
 };
 
@@ -166,7 +169,8 @@ function normalizeInputs(
     pullRequests: normalizeLogMetric(gitHubMetrics?.pullRequests, FORK_LOG_CAP),
     githubLicense: gitHubMetrics ? normalizeBoolean(Boolean(gitHubMetrics.license)) : null,
     resolutionTime: normalizeInverseDays(
-      issueMetrics?.averageResolutionTimeDays ??
+      issueMetrics?.medianResolutionTimeDays ??
+        issueMetrics?.averageResolutionTimeDays ??
         (issueMetrics?.averageResolutionTimeHours == null
           ? null
           : issueMetrics.averageResolutionTimeHours / 24),
@@ -174,7 +178,8 @@ function normalizeInputs(
       180
     ),
     firstResponseTime: normalizeInverseDays(
-      issueMetrics?.averageFirstResponseTimeDays ??
+      issueMetrics?.medianFirstResponseTimeDays ??
+        issueMetrics?.averageFirstResponseTimeDays ??
         (issueMetrics?.firstResponseTimeHours == null
           ? null
           : issueMetrics.firstResponseTimeHours / 24),
@@ -189,6 +194,14 @@ function normalizeInputs(
         issueMetrics?.closeRateByPR
     ),
     codeResolutionRate: normalizeRate(issueMetrics?.codeResolutionRate),
+    healthyClosureRate: normalizeRate(
+      issueMetrics?.healthyClosureRate ??
+        (issueMetrics?.uncodedCloseRate == null
+          ? issueMetrics?.codeResolutionRate
+          : 1 - issueMetrics.uncodedCloseRate)
+    ),
+    staleOpenIssueRate: normalizeInverseRate(issueMetrics?.staleOpenIssueRate),
+    sampleSize: normalizeCappedMetric(issueMetrics?.totalIssuesAnalyzed, 80),
     postCloseActivityRate: normalizeInverseRate(issueMetrics?.postCloseActivityRate),
   };
 }
@@ -243,13 +256,14 @@ export function scoreDependency(input: EnrichedDependencyInput): DependencyScore
 
   const issueResolutionScore = weightedAverage(
     [
-      { value: normalizedInputs.resolutionTime, weight: 0.2 },
+      { value: normalizedInputs.resolutionTime, weight: 0.25 },
       { value: normalizedInputs.firstResponseTime, weight: 0.15 },
       { value: normalizedInputs.closureRate, weight: 0.2 },
-      { value: normalizedInputs.noResponseRate, weight: 0.15 },
-      { value: normalizedInputs.closedByPrRate, weight: 0.1 },
-      { value: normalizedInputs.codeResolutionRate, weight: 0.15 },
+      { value: normalizedInputs.healthyClosureRate, weight: 0.15 },
+      { value: normalizedInputs.staleOpenIssueRate, weight: 0.1 },
       { value: normalizedInputs.postCloseActivityRate, weight: 0.05 },
+      { value: normalizedInputs.codeResolutionRate, weight: 0.03 },
+      { value: normalizedInputs.closedByPrRate, weight: 0.02 },
     ]
   );
 

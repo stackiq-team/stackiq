@@ -177,7 +177,6 @@ export default function JsonDropZone() {
         <div className="scanner-panel">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Input</p>
               <h2>Package source</h2>
             </div>
             {fileName && <span className="file-pill">{fileName}</span>}
@@ -255,7 +254,6 @@ export default function JsonDropZone() {
         </div>
 
         <aside className="home-output-panel">
-          <p className="eyebrow">Output</p>
           <h2>What StackIQ checks</h2>
           <div className="home-output-list">
             <div className="home-output-item">
@@ -275,8 +273,8 @@ export default function JsonDropZone() {
             <div className="home-output-item">
               <span className="home-output-dot signal-green"></span>
               <div>
-                <strong>Evidence links</strong>
-                <p>GitHub issue references behind warnings, so risk stays explainable.</p>
+                <strong>Detailed breakdowns</strong>
+                <p>Open each dependency to inspect repository, package, score, relationship, and issue signals.</p>
               </div>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import type { EnrichedDependencyInput } from "./dependencyScore.js";
 import { scoreDependency } from "./dependencyScore.js";
+import type { IssueSummary } from "./types/issuesMining.types.js";
 
 export type DependencyRelationshipType =
   | "KNOWN_INCOMPATIBILITY"
@@ -40,6 +41,7 @@ export type DependencyRelationshipResult = {
 
 type IssueSearchResult = {
   total_count?: number;
+  maxEvidenceIssues?: number;
   items?: Array<{
     number?: number;
     title?: string;
@@ -48,13 +50,6 @@ type IssueSearchResult = {
     body?: string | null;
     labels?: Array<{ name?: string }>;
   }>;
-};
-
-type RelationshipSearchInput = {
-  owner: string;
-  repo: string;
-  targetDependencyName: string;
-  perPage: number;
 };
 
 type RelationshipPair = {
@@ -73,6 +68,10 @@ type RelationshipCacheDelegate = {
   update?: (args: any) => Promise<any>;
   upsert?: (args: any) => Promise<any>;
 };
+
+type RelationshipIssueDataLoader = (
+  source: RelationshipPair["source"]
+) => Promise<IssueSummary[] | null | undefined>;
 
 const conflictTerms = [
   "incompatible",
@@ -97,14 +96,15 @@ const integrationTerms = [
 ];
 
 const riskyLabels = ["bug", "regression", "compatibility", "breaking-change"];
-const RELATIONSHIP_CACHE_VERSION = "relationship-v1";
+const RELATIONSHIP_CACHE_VERSION = "relationship-v3-deep-issuemining";
 
 export async function analyzeDependencyRelationships(args: {
   analysisId: string;
   dependencies: EnrichedDependencyInput[];
   logger?: Pick<Console, "log" | "error">;
-  searchIssues?: (input: RelationshipSearchInput) => Promise<IssueSearchResult>;
   relationshipCache?: RelationshipCacheDelegate | null;
+  getIssueData?: RelationshipIssueDataLoader;
+  issueDataSampleKey?: string;
 }): Promise<DependencyRelationshipResult[]> {
   const logger = args.logger ?? console;
   if (process.env.DEPENDENCY_RELATIONSHIPS_ENABLED === "false") {
@@ -113,33 +113,35 @@ export async function analyzeDependencyRelationships(args: {
   }
 
   const candidates = args.dependencies.filter(hasRepository);
-  const maxPairs = positiveInteger(process.env.DEPENDENCY_RELATIONSHIP_MAX_PAIRS, 30);
-  const perPage = positiveInteger(process.env.DEPENDENCY_RELATIONSHIP_SEARCH_RESULTS, 3);
-  const searchIssues = args.searchIssues ?? searchDependencyMentionIssues;
+  const maxEvidenceIssues = positiveInteger(
+    process.env.DEPENDENCY_RELATIONSHIP_EVIDENCE_LIMIT ??
+      process.env.DEPENDENCY_RELATIONSHIP_SEARCH_RESULTS,
+    3
+  );
   const relationshipCache = args.relationshipCache ?? null;
+  const issueDataSampleKey = args.issueDataSampleKey ?? "score-sample";
   const results: DependencyRelationshipResult[] = [];
   const skippedWithoutRepository = args.dependencies.length - candidates.length;
   const prioritizedPairs = prioritizeRelationshipPairs(candidates);
 
   logger.log(
-    `[relationships] Starting prioritized pair search: analysisId=${args.analysisId}, candidates=${candidates.length}, totalPairs=${prioritizedPairs.length}, skippedWithoutRepository=${skippedWithoutRepository}, maxPairs=${maxPairs}, perPage=${perPage}`
+    `[relationships] Starting issueMining relationship scan: analysisId=${args.analysisId}, candidates=${candidates.length}, totalPairs=${prioritizedPairs.length}, skippedWithoutRepository=${skippedWithoutRepository}, maxEvidenceIssues=${maxEvidenceIssues}`
   );
 
   let searchedPairs = 0;
   let cacheHits = 0;
   for (const pair of prioritizedPairs) {
     const { source, target } = pair;
-    if (searchedPairs >= maxPairs) {
-      logger.log(
-        `[relationships] Pair cap reached: analysisId=${args.analysisId}, maxPairs=${maxPairs}, totalPairs=${prioritizedPairs.length}, checkedPairs=${searchedPairs}, cacheHits=${cacheHits}`
-      );
-      return results;
-    }
 
     searchedPairs += 1;
     const repository = source.gitHubMetrics.repository;
     const pairLabel = `${source.dependency.name}->${target.dependency.name}`;
-    const cacheKey = buildRelationshipCacheKey(source, target, perPage);
+    const cacheKey = buildRelationshipCacheKey(
+      source,
+      target,
+      maxEvidenceIssues,
+      issueDataSampleKey
+    );
     const cachedRelationship = await readCachedRelationship({
       cache: relationshipCache,
       cacheKey,
@@ -152,30 +154,38 @@ export async function analyzeDependencyRelationships(args: {
     if (cachedRelationship) {
       cacheHits += 1;
       logger.log(
-        `[relationships] Cache hit: analysisId=${args.analysisId}, pair=${pairLabel}, repo=${repository.fullName}, pairIndex=${searchedPairs}/${maxPairs}`
+        `[relationships] Cache hit: analysisId=${args.analysisId}, pair=${pairLabel}, repo=${repository.fullName}, pairIndex=${searchedPairs}/${prioritizedPairs.length}`
       );
       results.push(cachedRelationship);
       continue;
     }
 
-    logger.log(
-      `[relationships] Searching prioritized pair: analysisId=${args.analysisId}, pair=${pairLabel}, repo=${repository.fullName}, priority=${pair.priority}, reasons=${pair.reasons.join("|") || "baseline"}, pairIndex=${searchedPairs}/${maxPairs}`
-    );
-
     try {
-      const issueSearchResult = await searchIssues({
-        owner: repository.owner,
-        repo: repository.name,
+      const sourceForScan = await loadRelationshipSourceIssueData({
+        source,
+        getIssueData: args.getIssueData,
+        logger,
+        analysisId: args.analysisId,
+        pairLabel,
+      });
+      const sampledIssues = sourceForScan.issueData?.length ?? 0;
+
+      logger.log(
+        `[relationships] Scanning issueMining sample: analysisId=${args.analysisId}, pair=${pairLabel}, repo=${repository.fullName}, priority=${pair.priority}, reasons=${pair.reasons.join("|") || "baseline"}, pairIndex=${searchedPairs}/${prioritizedPairs.length}, sampledIssues=${sampledIssues}, sampleKey=${issueDataSampleKey}`
+      );
+
+      const issueSearchResult = buildIssueMiningRelationshipSearchResult({
+        source: sourceForScan,
         targetDependencyName: target.dependency.name,
-        perPage,
+        maxEvidenceIssues,
       });
       logger.log(
-        `[relationships] Search result received: analysisId=${args.analysisId}, pair=${pairLabel}, totalCount=${issueSearchResult.total_count ?? 0}, returnedItems=${issueSearchResult.items?.length ?? 0}`
+        `[relationships] issueMining scan complete: analysisId=${args.analysisId}, pair=${pairLabel}, sampledIssues=${sampledIssues}, matchedIssues=${issueSearchResult.items?.length ?? 0}`
       );
 
       const relationship = classifyRelationship({
           analysisId: args.analysisId,
-          source,
+          source: sourceForScan,
           target,
           issueSearchResult,
           searchedAt: new Date().toISOString(),
@@ -194,16 +204,16 @@ export async function analyzeDependencyRelationships(args: {
       results.push(relationship);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Unknown dependency relationship search error";
+        error instanceof Error ? error.message : "Unknown dependency relationship scan error";
       logger.error(
-        `[relationships] Search failed: analysisId=${args.analysisId}, source=${source.dependency.name}, target=${target.dependency.name}, error=${message}`
+        `[relationships] issueMining scan failed: analysisId=${args.analysisId}, source=${source.dependency.name}, target=${target.dependency.name}, error=${message}`
       );
       results.push(
         unknownRelationship({
           analysisId: args.analysisId,
           source,
           target,
-          summary: `Relationship search failed for ${source.dependency.name} and ${target.dependency.name}: ${message}`,
+          summary: `Relationship scan failed for ${source.dependency.name} and ${target.dependency.name}: ${message}`,
           searchedAt: new Date().toISOString(),
         })
       );
@@ -217,28 +227,54 @@ export async function analyzeDependencyRelationships(args: {
   return results;
 }
 
-async function searchDependencyMentionIssues(
-  input: RelationshipSearchInput
-): Promise<IssueSearchResult> {
-  const token = getToken();
-  const query = `repo:${input.owner}/${input.repo} is:issue ${input.targetDependencyName} in:title,body`;
-  const params = new URLSearchParams({
-    q: query,
-    per_page: String(Math.max(1, Math.min(input.perPage, 10))),
-  });
+function buildIssueMiningRelationshipSearchResult(args: {
+  source: EnrichedDependencyInput;
+  targetDependencyName: string;
+  maxEvidenceIssues: number;
+}): IssueSearchResult {
+  const items = (args.source.issueData ?? [])
+    .map((issue) => ({
+      number: issue.number,
+      title: issue.title ?? `Issue #${issue.number}`,
+      html_url: issue.url ?? `${args.source.gitHubMetrics?.repository.url ?? ""}/issues/${issue.number}`,
+      state: issue.closed ? "closed" : "open",
+      body: issue.bodyPreview ?? "",
+      labels: (issue.labels ?? []).map((name) => ({ name })),
+    }))
+    .filter((issue) => issue.number != null);
 
-  const response = await fetch(`https://api.github.com/search/issues?${params}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-    },
-  });
+  return {
+    total_count: args.source.issueData?.length ?? 0,
+    maxEvidenceIssues: args.maxEvidenceIssues,
+    items,
+  };
+}
 
-  if (!response.ok) {
-    throw new Error(`GitHub issue search failed with status ${response.status}`);
+async function loadRelationshipSourceIssueData(args: {
+  source: RelationshipPair["source"];
+  getIssueData?: RelationshipIssueDataLoader | undefined;
+  logger: Pick<Console, "log" | "error">;
+  analysisId: string;
+  pairLabel: string;
+}): Promise<RelationshipPair["source"]> {
+  if (!args.getIssueData) return args.source;
+
+  try {
+    const issueData = await args.getIssueData(args.source);
+    if (!Array.isArray(issueData)) return args.source;
+
+    return {
+      ...args.source,
+      issueData,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown relationship issueMining loader error";
+    args.logger.error(
+      `[relationships] Deep issueMining sample unavailable: analysisId=${args.analysisId}, pair=${args.pairLabel}, error=${message}`
+    );
+    return args.source;
   }
-
-  return (await response.json()) as IssueSearchResult;
 }
 
 function prioritizeRelationshipPairs(
@@ -329,7 +365,8 @@ function packageFamily(packageName: string) {
 function buildRelationshipCacheKey(
   source: RelationshipPair["source"],
   target: RelationshipPair["target"],
-  perPage: number
+  perPage: number,
+  issueDataSampleKey: string
 ) {
   return [
     RELATIONSHIP_CACHE_VERSION,
@@ -337,6 +374,7 @@ function buildRelationshipCacheKey(
     source.dependency.name.toLowerCase(),
     target.dependency.name.toLowerCase(),
     String(perPage),
+    issueDataSampleKey,
   ].join("|");
 }
 
@@ -364,7 +402,7 @@ async function readCachedRelationship(args: {
     });
 
     const evidence = getRecord(cached.evidence) ?? {
-      query: `repo:${args.source.gitHubMetrics.repository.fullName} is:issue ${args.target.dependency.name} in:title,body`,
+      query: `issueMining:${args.source.gitHubMetrics.repository.fullName} mentions ${args.target.dependency.name}`,
       totalCount: cached.searchTotalCount ?? 0,
       issues: [],
       searchedAt: new Date().toISOString(),
@@ -462,7 +500,7 @@ function classifyRelationship(args: {
       evidence,
       relationshipType: "KNOWN_INCOMPATIBILITY",
       confidence: "HIGH",
-      riskAdjustment: -12,
+      riskAdjustment: 0,
       summary: `${args.source.dependency.name} has open issue evidence mentioning ${args.target.dependency.name} with conflict language.`,
     });
   }
@@ -473,7 +511,7 @@ function classifyRelationship(args: {
       evidence,
       relationshipType: "POSSIBLE_CONFLICT",
       confidence: "MEDIUM",
-      riskAdjustment: -8,
+      riskAdjustment: 0,
       summary: `${args.source.dependency.name} has multiple issues mentioning ${args.target.dependency.name} with conflict language.`,
     });
   }
@@ -484,7 +522,7 @@ function classifyRelationship(args: {
       evidence,
       relationshipType: "POSSIBLE_CONFLICT",
       confidence: "MEDIUM",
-      riskAdjustment: -5,
+      riskAdjustment: 0,
       summary: `${args.source.dependency.name} has issue evidence suggesting possible friction with ${args.target.dependency.name}.`,
     });
   }
@@ -495,7 +533,7 @@ function classifyRelationship(args: {
       evidence,
       relationshipType: "INTEGRATION_MENTION",
       confidence: "LOW",
-      riskAdjustment: -1,
+      riskAdjustment: 0,
       summary: `${args.source.dependency.name} issues mention ${args.target.dependency.name}, but no strong incompatibility signal was found.`,
     });
   }
@@ -527,19 +565,20 @@ function extractEvidence(
       ...conflictTerms,
       ...integrationTerms,
     ].filter((term) => text.includes(term.toLowerCase()));
+    const state: "open" | "closed" = issue.state === "closed" ? "closed" : "open";
 
     return [
       {
         issueNumber: issue.number,
         title: issue.title,
         url: issue.html_url,
-        state: issue.state === "closed" ? "closed" : "open",
+        state,
         labels,
         matchedTerms,
         bodyPreview: issue.body ? issue.body.slice(0, 600) : null,
       },
     ];
-  });
+  }).slice(0, Math.max(1, result.maxEvidenceIssues ?? 3));
 }
 
 function relationshipResult(args: {
@@ -567,7 +606,7 @@ function relationshipResult(args: {
     riskAdjustment: args.riskAdjustment,
     summary: args.summary,
     evidence: {
-      query: `repo:${repository.fullName} is:issue ${args.target.dependency.name} in:title,body`,
+      query: `issueMining:${repository.fullName} mentions ${args.target.dependency.name}`,
       totalCount: args.issueSearchResult.total_count ?? 0,
       issues: args.evidence,
       searchedAt: args.searchedAt,
@@ -595,7 +634,7 @@ function unknownRelationship(args: {
     riskAdjustment: 0,
     summary: args.summary,
     evidence: {
-      query: `repo:${repository.fullName} is:issue ${args.target.dependency.name} in:title,body`,
+      query: `issueMining:${repository.fullName} mentions ${args.target.dependency.name}`,
       totalCount: 0,
       issues: [],
       searchedAt: args.searchedAt,

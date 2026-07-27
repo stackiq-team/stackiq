@@ -5,6 +5,7 @@ export type AnalysisJobData = {
   email?: string;
   owner?: string;
   repo?: string;
+  source?: "USER_UPLOAD" | "USER_REPOSITORY" | "EXPLORE_REFRESH" | "WEEKLY_REFRESH";
 };
 
 export const ANALYSIS_QUEUE_NAME =
@@ -19,6 +20,9 @@ export const DEFAULT_ANALYSIS_JOB_OPTIONS = {
   removeOnComplete: true,
   removeOnFail: false,
 };
+
+const USER_JOB_PRIORITY = 1;
+const BACKGROUND_JOB_PRIORITY = 1000;
 
 const redisUrl = new URL(process.env.REDIS_URL || "redis://redis:6379");
 
@@ -38,17 +42,23 @@ export const analysisQueue = new Queue<
 });
 
 export async function enqueueAnalysisJob(data: AnalysisJobData) {
+  const priority = isUserJob(data) ? USER_JOB_PRIORITY : BACKGROUND_JOB_PRIORITY;
   console.log(
-    `[queue] Enqueuing analysis job: analysisId=${data.analysisId}, queue=${ANALYSIS_QUEUE_NAME}`
+    `[queue] Enqueuing analysis job: analysisId=${data.analysisId}, queue=${ANALYSIS_QUEUE_NAME}, source=${data.source ?? "USER_UPLOAD"}, priority=${priority}`
   );
 
   const job = await analysisQueue.add("run-analysis", data, {
     jobId: data.analysisId,
+    priority,
   });
 
   console.log(
-    `[queue] Analysis job enqueued: jobId=${job.id}, analysisId=${data.analysisId}`
+    `[queue] Analysis job enqueued: jobId=${job.id}, analysisId=${data.analysisId}, priority=${priority}`
   );
 
   return job;
+}
+
+function isUserJob(data: AnalysisJobData) {
+  return !data.source || data.source === "USER_UPLOAD" || data.source === "USER_REPOSITORY";
 }

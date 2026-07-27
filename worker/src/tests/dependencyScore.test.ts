@@ -62,7 +62,9 @@ const issueMetrics = {
   recentActivityCount: 4,
   averageResolutionTimeHours: 7 * 24,
   averageResolutionTimeDays: 7,
+  medianResolutionTimeDays: 7,
   averageFirstResponseTimeDays: 1,
+  medianFirstResponseTimeDays: 1,
   firstResponseTimeHours: 24,
   closureRate: 1,
   noResponseRate: 0,
@@ -74,6 +76,12 @@ const issueMetrics = {
   openToAssignedTimeHours: 24,
   mergedPRRate: 1,
   uncodedCloseRate: 0,
+  healthyClosureRate: 1,
+  staleOpenIssueRate: 0,
+  sampleRecentOpenIssues: 0,
+  sampleRecentClosedIssues: 10,
+  sampleOlderClosedIssues: 0,
+  sampleOldOpenIssues: 0,
 };
 
 describe("dependency scoring", () => {
@@ -109,7 +117,9 @@ describe("dependency scoring", () => {
         ...issueMetrics,
         averageResolutionTimeDays: 180,
         averageResolutionTimeHours: 180 * 24,
+        medianResolutionTimeDays: 180,
         averageFirstResponseTimeDays: 90,
+        medianFirstResponseTimeDays: 90,
         firstResponseTimeHours: 90 * 24,
         closureRate: 0,
         noResponseRate: 1,
@@ -117,6 +127,8 @@ describe("dependency scoring", () => {
         closedByPrRate: 0,
         closedByPRRate: 0,
         codeResolutionRate: 0,
+        healthyClosureRate: 0,
+        staleOpenIssueRate: 1,
         postCloseActivityRate: 1,
       },
     });

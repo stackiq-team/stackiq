@@ -6,7 +6,11 @@ export interface IssuesMiningMetrics {
   recentActivityCount: number | null;     // issues opened or closed in the last 30 days
   averageResolutionTimeHours: number | null;
   averageResolutionTimeDays: number | null;
+  medianResolutionTimeHours?: number | null;
+  medianResolutionTimeDays: number | null;
   averageFirstResponseTimeDays: number | null;
+  medianFirstResponseTimeHours?: number | null;
+  medianFirstResponseTimeDays: number | null;
   firstResponseTimeHours: number | null;
   closureRate: number | null;
   noResponseRate: number | null;
@@ -18,15 +22,27 @@ export interface IssuesMiningMetrics {
   openToAssignedTimeHours: number | null;
   mergedPRRate: number | null;            // of PR-closed issues, how many were actually merged
   uncodedCloseRate: number | null;        // ratio of issues closed with no code reference
+  healthyClosureRate: number | null;
+  staleOpenIssueRate: number | null;
+  sampleRecentOpenIssues: number | null;
+  sampleRecentClosedIssues: number | null;
+  sampleOlderClosedIssues: number | null;
+  sampleOldOpenIssues: number | null;
 }
 
 export interface IssueSummary {
   number: number;
+  title?: string | null;
+  url?: string | null;
+  bodyPreview?: string | null;
+  labels?: string[];
   publishedAt: string;
   closedAt: string | null;
   closed: boolean;
   assigneesCount: number;
   firstAssignedAt: string | null;
+  firstMaintainerResponseAt?: string | null;
+  sampleBucket?: 'recentOpen' | 'recentClosed' | 'olderClosed' | 'oldOpen' | null;
   closer: {
     stateReason: string | null;
     type: string | null;

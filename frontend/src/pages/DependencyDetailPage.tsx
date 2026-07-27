@@ -18,6 +18,45 @@ interface DependencyDetail {
   riskLevel: RiskLevel;
   scoreEntry?: ScoreEntry;
   relationships: RelationshipEntry[];
+  analysisStatus: AnalysisLookupResponse["analysis"]["status"];
+}
+
+function relationshipAnalysisStatus(
+  analysisStatus: AnalysisLookupResponse["analysis"]["status"],
+  dependencyName: string,
+  dependencyRelationshipCount: number
+) {
+  if (analysisStatus === "FAILED") {
+    return {
+      label: "Failed",
+      className: "relationship-status-failed",
+      message: "Relationship analysis did not complete because the analysis failed.",
+    };
+  }
+
+  if (analysisStatus !== "COMPLETED") {
+    return {
+      label: "Running",
+      className: "relationship-status-running",
+      message: "Relationship analysis is still running. These counts will appear after the relationship pass finishes.",
+    };
+  }
+
+  if (dependencyRelationshipCount === 0) {
+    return {
+      label: "Not available",
+      className: "relationship-status-waiting",
+      message: `${dependencyName} was not checked against other dependencies.`,
+    };
+  }
+
+  return {
+    label: "Completed",
+    className: "relationship-status-completed",
+    message: `${dependencyName} was checked against ${dependencyRelationshipCount} other ${
+      dependencyRelationshipCount === 1 ? "dependency" : "dependencies"
+    }.`,
+  };
 }
 
 function riskClassName(risk: RiskLevel): string {
@@ -414,6 +453,7 @@ export default function DependencyDetailPage() {
         relationships: response.data.analysis.dependencyRelationships.filter(
           (relationship) => relationship.sourceDependencyId === depScore.dependency.id
         ),
+        analysisStatus: response.data.analysis.status,
       });
       setLoading(false);
     } catch (err) {
@@ -531,6 +571,14 @@ export default function DependencyDetailPage() {
     (relationship) => relationship.relationshipType !== "UNKNOWN"
   );
   const unknownRelationshipCount = dependency.relationships.length - visibleRelationships.length;
+  const relationshipAnalysisPending = dependency.analysisStatus !== "COMPLETED";
+  const relationshipChecksAvailable = dependency.relationships.length > 0;
+  const relationshipStatus = relationshipAnalysisStatus(
+    dependency.analysisStatus,
+    dependency.name,
+    dependency.relationships.length
+  );
+  const showRelationshipCounts = !relationshipAnalysisPending && relationshipChecksAvailable;
   const relationshipCounts = visibleRelationships.reduce(
     (counts, relationship) => {
       if (relationship.relationshipType === "KNOWN_INCOMPATIBILITY") counts.known += 1;
@@ -576,15 +624,17 @@ export default function DependencyDetailPage() {
       label: "Issue resolution",
       score: dependency.scoreEntry?.resolutionQualityScore ?? null,
       weight: 0.2,
-      description: "Sampled issue-mining signals: resolution time, first response, closure rate, PR closures, and post-close activity.",
+      description: "Balanced issue-mining signals: median resolution, maintainer response, closure health, stale backlog, and sample coverage.",
       inputs: [
-        { label: "Resolution time", key: "resolutionTime", raw: `${formatMetric(typeof issueMetrics?.averageResolutionTimeDays === "number" ? issueMetrics.averageResolutionTimeDays : null)} days avg` },
-        { label: "First response time", key: "firstResponseTime", raw: `${formatMetric(typeof issueMetrics?.averageFirstResponseTimeDays === "number" ? issueMetrics.averageFirstResponseTimeDays : null)} days avg` },
+        { label: "Resolution time", key: "resolutionTime", raw: `${formatMetric(typeof issueMetrics?.medianResolutionTimeDays === "number" ? issueMetrics.medianResolutionTimeDays : typeof issueMetrics?.averageResolutionTimeDays === "number" ? issueMetrics.averageResolutionTimeDays : null)} days median` },
+        { label: "Maintainer response time", key: "firstResponseTime", raw: `${formatMetric(typeof issueMetrics?.medianFirstResponseTimeDays === "number" ? issueMetrics.medianFirstResponseTimeDays : typeof issueMetrics?.averageFirstResponseTimeDays === "number" ? issueMetrics.averageFirstResponseTimeDays : null)} days median` },
         { label: "Closure rate", key: "closureRate", raw: formatPercentValue(issueMetrics?.closureRate) },
-        { label: "No-response rate", key: "noResponseRate", raw: formatPercentValue(issueMetrics?.noResponseRate) },
-        { label: "Closed by PR rate", key: "closedByPrRate", raw: formatPercentValue(issueMetrics?.closedByPrRate ?? issueMetrics?.closedByPRRate) },
-        { label: "Code resolution rate", key: "codeResolutionRate", raw: formatPercentValue(issueMetrics?.codeResolutionRate) },
+        { label: "Healthy closure rate", key: "healthyClosureRate", raw: formatPercentValue(issueMetrics?.healthyClosureRate) },
+        { label: "Stale open issue rate", key: "staleOpenIssueRate", raw: formatPercentValue(issueMetrics?.staleOpenIssueRate) },
         { label: "Post-close activity", key: "postCloseActivityRate", raw: formatPercentValue(issueMetrics?.postCloseActivityRate) },
+        { label: "Sample coverage", key: "sampleSize", raw: formatMetric(typeof issueMetrics?.totalIssuesAnalyzed === "number" ? issueMetrics.totalIssuesAnalyzed : null) },
+        { label: "Code-linked closure rate", key: "codeResolutionRate", raw: formatPercentValue(issueMetrics?.codeResolutionRate) },
+        { label: "Closed by PR rate", key: "closedByPrRate", raw: formatPercentValue(issueMetrics?.closedByPrRate ?? issueMetrics?.closedByPRRate) },
       ],
     },
   ];
@@ -787,26 +837,44 @@ export default function DependencyDetailPage() {
 
       {activeTab === "relationships" && (
       <article className="github-section">
-        <h2>Dependency Relationships</h2>
+        <div className="relationship-section-heading">
+          <div>
+            <h2>Dependency Relationships</h2>
+            <p>{relationshipStatus.message}</p>
+          </div>
+          <span className={`relationship-status-badge ${relationshipStatus.className}`}>
+            {relationshipStatus.label}
+          </span>
+        </div>
         <div className="relationship-summary-grid">
           <div className="relationship-summary-card relationship-summary-critical">
             <span>Known incompatibilities</span>
-            <strong>{relationshipCounts.known}</strong>
+            <strong>{showRelationshipCounts ? relationshipCounts.known : "-"}</strong>
           </div>
           <div className="relationship-summary-card relationship-summary-warning">
             <span>Possible conflicts</span>
-            <strong>{relationshipCounts.possible}</strong>
+            <strong>{showRelationshipCounts ? relationshipCounts.possible : "-"}</strong>
           </div>
           <div className="relationship-summary-card relationship-summary-info">
             <span>Integration mentions</span>
-            <strong>{relationshipCounts.mentions}</strong>
+            <strong>{showRelationshipCounts ? relationshipCounts.mentions : "-"}</strong>
           </div>
           <div className="relationship-summary-card">
             <span>No evidence found</span>
-            <strong>{unknownRelationshipCount}</strong>
+            <strong>{showRelationshipCounts ? unknownRelationshipCount : "-"}</strong>
           </div>
         </div>
-        {unknownRelationshipCount > 0 && (
+        {relationshipAnalysisPending && (
+          <p className="relationship-status-note">
+            Relationship results for this dependency are not ready yet.
+          </p>
+        )}
+        {!relationshipAnalysisPending && !relationshipChecksAvailable && (
+          <p className="relationship-status-note">
+            No dependency-specific relationship checks were saved. This usually means this dependency had no repository data available for relationship scanning.
+          </p>
+        )}
+        {showRelationshipCounts && unknownRelationshipCount > 0 && (
           <p className="relationship-muted-note">
             {unknownRelationshipCount} checked dependencies had no issue evidence for this package.
           </p>
@@ -826,11 +894,6 @@ export default function DependencyDetailPage() {
                     <span className={`relationship-badge ${relationshipClassName(relationship.relationshipType)}`}>
                       {relationshipLabel(relationship.relationshipType)}
                     </span>
-                  </div>
-
-                  <div className="relationship-meta">
-                    <span>Confidence: {relationship.confidence}</span>
-                    <span>Score adjustment: {relationship.riskAdjustment}</span>
                   </div>
 
                   {issues.length > 0 ? (
@@ -855,7 +918,11 @@ export default function DependencyDetailPage() {
           </div>
         ) : (
           <div className="github-metric-value">
-            No relationship risks or integration mentions were found for this dependency.
+            {relationshipAnalysisPending
+              ? "Relationship results are not ready for this dependency yet."
+              : relationshipChecksAvailable
+                ? "No relationship risks or integration mentions were found for this dependency."
+                : "No relationship checks are available for this dependency."}
           </div>
         )}
       </article>
@@ -965,11 +1032,15 @@ export default function DependencyDetailPage() {
             </div>
             <p className="signal-description">
               These numbers come from the issue-mining sample, not the repository lifetime totals.
-              The miner checks the configured recent lookback window and caps collection at 30 open and 70 closed issues.
+              The miner uses a balanced sample of recent open, recent closed, older closed, and old open issues.
             </p>
             <dl className="signal-list">
               <div><dt>Sampled open issues</dt><dd>{formatMetric(typeof issueMetrics?.openIssues === "number" ? issueMetrics.openIssues : null)}</dd></div>
               <div><dt>Sampled closed issues</dt><dd>{formatMetric(typeof issueMetrics?.closedIssues === "number" ? issueMetrics.closedIssues : null)}</dd></div>
+              <div><dt>Recent open sample</dt><dd>{formatMetric(typeof issueMetrics?.sampleRecentOpenIssues === "number" ? issueMetrics.sampleRecentOpenIssues : null)}</dd></div>
+              <div><dt>Recent closed sample</dt><dd>{formatMetric(typeof issueMetrics?.sampleRecentClosedIssues === "number" ? issueMetrics.sampleRecentClosedIssues : null)}</dd></div>
+              <div><dt>Older closed sample</dt><dd>{formatMetric(typeof issueMetrics?.sampleOlderClosedIssues === "number" ? issueMetrics.sampleOlderClosedIssues : null)}</dd></div>
+              <div><dt>Old open sample</dt><dd>{formatMetric(typeof issueMetrics?.sampleOldOpenIssues === "number" ? issueMetrics.sampleOldOpenIssues : null)}</dd></div>
               <div><dt>Warnings</dt><dd>{warnings.length}</dd></div>
             </dl>
             {warnings.length > 0 ? (
@@ -1319,7 +1390,7 @@ export default function DependencyDetailPage() {
           </div>
 
           <div className="metric-placeholder metric-placeholder-wide" id="issue-activity-note">
-            <p>* Issue activity analysis is capped at 30 open issues and 70 closed issues.</p>
+            <p>* Issue activity analysis uses a balanced sample of recent open, recent closed, older closed, and old open issues.</p>
           </div>
 
         </div>

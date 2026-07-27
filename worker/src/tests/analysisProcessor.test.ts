@@ -96,7 +96,9 @@ const issueResult = {
     recentActivityCount: 3,
     averageResolutionTimeHours: 48,
     averageResolutionTimeDays: 2,
+    medianResolutionTimeDays: 2,
     averageFirstResponseTimeDays: 1,
+    medianFirstResponseTimeDays: 1,
     firstResponseTimeHours: 24,
     closureRate: 0.8,
     noResponseRate: 0.1,
@@ -108,6 +110,12 @@ const issueResult = {
     openToAssignedTimeHours: null,
     mergedPRRate: 0.5,
     uncodedCloseRate: 0.2,
+    healthyClosureRate: 0.8,
+    staleOpenIssueRate: 0.1,
+    sampleRecentOpenIssues: 2,
+    sampleRecentClosedIssues: 4,
+    sampleOlderClosedIssues: 4,
+    sampleOldOpenIssues: 0,
   },
 };
 
