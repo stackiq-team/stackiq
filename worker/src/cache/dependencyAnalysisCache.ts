@@ -7,12 +7,14 @@ import type {
 } from "../dependencyScore.js";
 import type { GitHubMinerOutput } from "../types/githubMinerType.js";
 import type { IssuesMiningMetrics, IssuesMiningResult } from "../types/issuesMining.types.js";
+import { compactIssuesMiningResultForStorage } from "../utils/issueDataPersistence.js";
+import { sanitizeJsonValue } from "../utils/jsonSanitizer.js";
 
 export const DEFAULT_DEPENDENCY_CACHE_TTL_DAYS = 14;
 export const DEFAULT_PARTIAL_DEPENDENCY_CACHE_TTL_DAYS = 1;
 export const DEFAULT_DEPENDENCY_CACHE_VERSION = "v1";
 const DEFAULT_LOCK_TTL_MS = 5 * 60 * 1000;
-const DEFAULT_LOCK_WAIT_MS = 30 * 1000;
+const DEFAULT_LOCK_WAIT_MS = 5 * 60 * 1000;
 const LOCK_RETRY_DELAY_MS = 100;
 
 export type DependencyCacheLookup = {
@@ -168,16 +170,18 @@ export class DependencyAnalysisCacheManager {
       repositoryName: repository.name || null,
       repositoryFullName: repository.fullName || null,
       repositoryUrl: repository.url || null,
-      githubMinerRaw: enrichedDependency.gitHubMetrics as unknown as Prisma.InputJsonValue,
-      issuesMiningRaw: issueResult as unknown as Prisma.InputJsonValue,
-      issueMetrics: enrichedDependency.issueMetrics as unknown as Prisma.InputJsonValue,
-      normalizedMetrics: score.breakdown.normalizedInputs as unknown as Prisma.InputJsonValue,
+      githubMinerRaw: sanitizeJsonValue(enrichedDependency.gitHubMetrics) as Prisma.InputJsonValue,
+      issuesMiningRaw: sanitizeJsonValue(
+        compactIssuesMiningResultForStorage(issueResult)
+      ) as Prisma.InputJsonValue,
+      issueMetrics: sanitizeJsonValue(enrichedDependency.issueMetrics) as Prisma.InputJsonValue,
+      normalizedMetrics: sanitizeJsonValue(score.breakdown.normalizedInputs) as Prisma.InputJsonValue,
       score: score.score,
       riskLevel: score.riskLevel,
       popularityScore: score.breakdown.popularityScore,
       maintenanceScore: score.breakdown.maintenanceScore,
       resolutionQualityScore: score.breakdown.resolutionQualityScore,
-      warnings: score.warnings as unknown as Prisma.InputJsonValue,
+      warnings: sanitizeJsonValue(score.warnings) as Prisma.InputJsonValue,
       status,
       issuesConfigHash: lookup.issuesConfigHash,
       cacheVersion: lookup.cacheVersion,
@@ -214,7 +218,7 @@ export class DependencyAnalysisCacheManager {
 
     const lockKey = `stackiq:dependency-cache-lock:${hashForKey(cacheKey)}`;
     const token = randomUUID();
-    const deadline = Date.now() + DEFAULT_LOCK_WAIT_MS;
+    const deadline = Date.now() + getDependencyCacheLockWaitMs();
 
     while (Date.now() < deadline) {
       const acquired = await this.lockClient.set(
@@ -259,12 +263,21 @@ export function getPartialDependencyCacheTtlDays() {
   );
 }
 
+export function getDependencyCacheLockWaitMs() {
+  return positiveNumber(
+    process.env.DEPENDENCY_CACHE_LOCK_WAIT_MS,
+    DEFAULT_LOCK_WAIT_MS
+  );
+}
+
 export function getIssuesConfigHash() {
   return createHash("sha256")
     .update(
       JSON.stringify({
         lookbackDays: process.env.ISSUES_MINING_LOOKBACK_DAYS ?? "60",
         maxIssues: process.env.ISSUES_MINING_MAX_ISSUES ?? "",
+        maxOpenIssues: process.env.ISSUES_MINING_MAX_OPEN_ISSUES ?? "",
+        maxClosedIssues: process.env.ISSUES_MINING_MAX_CLOSED_ISSUES ?? "",
         timelineItems: process.env.ISSUES_MINING_TIMELINE_ITEMS ?? "",
         maxTimelinePages: process.env.ISSUES_MINING_MAX_TIMELINE_PAGES ?? "",
         includeDevDependencies:

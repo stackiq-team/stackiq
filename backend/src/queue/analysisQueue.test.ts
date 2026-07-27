@@ -57,6 +57,30 @@ describe("analysisQueue", () => {
       },
       {
         jobId: "analysis-1",
+        priority: 1,
+      }
+    );
+  });
+
+  it("creates background jobs with lower priority than user jobs", async () => {
+    queueAddMock.mockResolvedValue({ id: "analysis-2" });
+
+    const { enqueueAnalysisJob } = await import("./analysisQueue");
+
+    await enqueueAnalysisJob({
+      analysisId: "analysis-2",
+      source: "EXPLORE_REFRESH",
+    });
+
+    expect(queueAddMock).toHaveBeenCalledWith(
+      "run-analysis",
+      {
+        analysisId: "analysis-2",
+        source: "EXPLORE_REFRESH",
+      },
+      {
+        jobId: "analysis-2",
+        priority: 1000,
       }
     );
   });

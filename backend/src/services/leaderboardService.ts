@@ -92,7 +92,7 @@ const repositoryPackageJsonQuery = `
 `;
 
 function getToken(): string {
-  const token = process.env.GITHUB_API_TOKEN?.trim();
+  const token = process.env.GITHUB_API_TOKEN?.split(",").map((value) => value.trim()).find(Boolean);
   if (!token) {
     throw new Error("GITHUB_API_TOKEN is required to query GitHub.");
   }
@@ -339,7 +339,7 @@ async function createAnalysisForRepository(owner: string, name: string): Promise
     },
   });
 
-  await enqueueAnalysisJob({ analysisId: analysis.id });
+  await enqueueAnalysisJob({ analysisId: analysis.id, source: "EXPLORE_REFRESH" });
 
   return {
     analysisId: analysis.id,
@@ -353,7 +353,7 @@ async function createOrUpdateLeaderboardItem(
   repoData: RepoLeaderboardItem,
   category: string,
   rank: number,
-  analysisCache: Map<string, RepositoryAnalysisInfo>
+  analysisCache: Map<string, Promise<RepositoryAnalysisInfo>>
 ) {
   const fullName = repoData.fullName;
   const existing = await prisma.leaderboardRepository.findUnique({
@@ -373,17 +373,19 @@ async function createOrUpdateLeaderboardItem(
   if (!analysisResultToken && !packageJsonPresent) {
     const cached = analysisCache.get(fullName);
     if (cached) {
-      analysisId = cached.analysisId;
-      analysisResultToken = cached.analysisResultToken;
-      analysisStatus = cached.analysisStatus;
-      packageJsonPresent = cached.packageJsonPresent;
-    } else {
-      const analysisInfo = await createAnalysisForRepository(repoData.owner, repoData.name);
+      const analysisInfo = await cached;
       analysisId = analysisInfo.analysisId;
       analysisResultToken = analysisInfo.analysisResultToken;
       analysisStatus = analysisInfo.analysisStatus;
       packageJsonPresent = analysisInfo.packageJsonPresent;
-      analysisCache.set(fullName, analysisInfo);
+    } else {
+      const analysisPromise = createAnalysisForRepository(repoData.owner, repoData.name);
+      analysisCache.set(fullName, analysisPromise);
+      const analysisInfo = await analysisPromise;
+      analysisId = analysisInfo.analysisId;
+      analysisResultToken = analysisInfo.analysisResultToken;
+      analysisStatus = analysisInfo.analysisStatus;
+      packageJsonPresent = analysisInfo.packageJsonPresent;
     }
   }
 
@@ -460,7 +462,7 @@ async function loadOrRefreshLeaderboards(forceRefresh = false, popularLimit = ge
     )
     .slice(0, 10);
 
-  const analysisCache = new Map<string, RepositoryAnalysisInfo>();
+  const analysisCache = new Map<string, Promise<RepositoryAnalysisInfo>>();
   await Promise.all([
     ...popular.map((repo, index) =>
       createOrUpdateLeaderboardItem(repo, "popular", index + 1, analysisCache)

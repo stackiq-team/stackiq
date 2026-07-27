@@ -111,7 +111,7 @@ export async function refreshTopRequestedDependencies(options: WeeklyRefreshOpti
       },
     });
 
-    await enqueue({ analysisId: analysis.id });
+    await enqueue({ analysisId: analysis.id, source: "WEEKLY_REFRESH" });
     enqueued += 1;
 
     logger.log(

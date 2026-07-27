@@ -8,7 +8,12 @@ import { fileURLToPath } from 'url';
 const ROTATION_THRESHOLD = 300;
 const DEFAULT_MAX_OPEN_ISSUES = 30;
 const DEFAULT_MAX_CLOSED_ISSUES = 70;
+const DEFAULT_RECENT_OPEN_ISSUES = 30;
+const DEFAULT_RECENT_CLOSED_ISSUES = 40;
+const DEFAULT_OLDER_CLOSED_ISSUES = 30;
+const DEFAULT_OLD_OPEN_ISSUES = 20;
 const DEFAULT_MAX_TIMELINE_PAGES = 1;
+const DEFAULT_HISTORY_START_DATE = '2015-01-01';
 
 let tokens = [];
 let tokenReset = [];
@@ -63,6 +68,10 @@ function trackingKey(repoFullName, state) {
   return `${repoFullName}:${state}`;
 }
 
+function bucketTrackingKey(repoFullName, bucket) {
+  return `${repoFullName}:${bucket}`;
+}
+
 async function checkAllTokens() {
   for (let i = 0; i < tokens.length; i++) {
     const { rateLimit } = await graphql(
@@ -90,13 +99,56 @@ async function checkAllTokens() {
 
 let issues = {};
 
-function getMaxIssues(state) {
-  const envKey = state === 'OPEN'
-    ? 'ISSUES_MINING_MAX_OPEN_ISSUES'
-    : 'ISSUES_MINING_MAX_CLOSED_ISSUES';
+function positiveInteger(value, fallback) {
+  const configured = Number(value);
+  return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : fallback;
+}
+
+function getLegacyMaxIssues(state) {
   const fallback = state === 'OPEN' ? DEFAULT_MAX_OPEN_ISSUES : DEFAULT_MAX_CLOSED_ISSUES;
-  const configured = Number(process.env[envKey] ?? fallback);
-  return Number.isFinite(configured) && configured > 0 ? configured : fallback;
+  const totalConfigured = Number(process.env.ISSUES_MINING_MAX_ISSUES);
+  const totalFallback = DEFAULT_MAX_OPEN_ISSUES + DEFAULT_MAX_CLOSED_ISSUES;
+  const derivedFallback = Number.isFinite(totalConfigured) && totalConfigured > 0
+    ? Math.max(1, Math.round(totalConfigured * (fallback / totalFallback)))
+    : fallback;
+  return state === 'OPEN'
+    ? positiveInteger(process.env.ISSUES_MINING_MAX_OPEN_ISSUES, derivedFallback)
+    : positiveInteger(process.env.ISSUES_MINING_MAX_CLOSED_ISSUES, derivedFallback);
+}
+
+function getSampleBuckets() {
+  return [
+    {
+      name: 'recentOpen',
+      state: 'OPEN',
+      since: null,
+      limit: positiveInteger(
+        process.env.ISSUES_MINING_RECENT_OPEN_LIMIT,
+        getLegacyMaxIssues('OPEN') || DEFAULT_RECENT_OPEN_ISSUES
+      ),
+    },
+    {
+      name: 'recentClosed',
+      state: 'CLOSED',
+      since: null,
+      limit: positiveInteger(
+        process.env.ISSUES_MINING_RECENT_CLOSED_LIMIT,
+        Math.min(getLegacyMaxIssues('CLOSED') || DEFAULT_RECENT_CLOSED_ISSUES, DEFAULT_RECENT_CLOSED_ISSUES)
+      ),
+    },
+    {
+      name: 'olderClosed',
+      state: 'CLOSED',
+      since: process.env.ISSUES_MINING_HISTORY_START_DATE ?? DEFAULT_HISTORY_START_DATE,
+      limit: positiveInteger(process.env.ISSUES_MINING_OLDER_CLOSED_LIMIT, DEFAULT_OLDER_CLOSED_ISSUES),
+    },
+    {
+      name: 'oldOpen',
+      state: 'OPEN',
+      since: process.env.ISSUES_MINING_HISTORY_START_DATE ?? DEFAULT_HISTORY_START_DATE,
+      limit: positiveInteger(process.env.ISSUES_MINING_OLD_OPEN_LIMIT, DEFAULT_OLD_OPEN_ISSUES),
+    },
+  ].filter((bucket) => bucket.limit > 0);
 }
 
 function getMaxTimelinePages() {
@@ -104,7 +156,7 @@ function getMaxTimelinePages() {
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_TIMELINE_PAGES;
 }
 
-async function executeQuery0(projects, index, cursor, startDate, state) {
+async function executeQuery0(projects, index, cursor, startDate, state, bucketName, maxIssues) {
   try {
     if (index >= endingProjectIndex) return;
 
@@ -112,14 +164,13 @@ async function executeQuery0(projects, index, cursor, startDate, state) {
       projects[index].replace("\r", "").split("/");
 
     const repoFullName = `${projectOwner}/${projectName}`;
-    const key = trackingKey(repoFullName, state);
+    const key = bucketTrackingKey(repoFullName, bucketName);
 
     if (!(key in tracking)) tracking[key] = 0;
-    if (tracking[key] >= getMaxIssues(state)) {
-      console.log(`[issuesMining] Reached ${state} issue cap: repo=${repoFullName}, max=${getMaxIssues(state)}`);
+    if (tracking[key] >= maxIssues) {
+      console.log(`[issuesMining] Reached ${bucketName} issue cap: repo=${repoFullName}, max=${maxIssues}`);
       return;
     }
-    tracking[key]++;
 
     // rotate if current token is running low
     if (tokenRemaining[tokenNum] !== -1 && tokenRemaining[tokenNum] <= ROTATION_THRESHOLD) {
@@ -167,7 +218,13 @@ async function executeQuery0(projects, index, cursor, startDate, state) {
         idata.issues.edges[0].node.items.edges = extraItems;
       }
 
-      issues[edges[0].node.number] = idata;
+      const issueNumber = edges[0].node.number;
+      const alreadyCollected = Boolean(issues[issueNumber]);
+      if (!alreadyCollected) {
+        idata.issues.edges[0].node.sampleBucket = bucketName;
+        issues[issueNumber] = idata;
+        tracking[key]++;
+      }
     }
 
     let nextIndex = index;
@@ -181,7 +238,7 @@ async function executeQuery0(projects, index, cursor, startDate, state) {
       return;
     }
 
-    return executeQuery0(projects, nextIndex, cursor, startDate, state);
+    return executeQuery0(projects, nextIndex, cursor, startDate, state, bucketName, maxIssues);
 
   } catch (err) {
     console.error('Error:', err.message);
@@ -240,14 +297,36 @@ export async function getIssues(owner, repo, startDate) {
 
   const projects = [`${owner}/${repo}`];
 
-  await executeQuery0(projects, currentProjectIndex, currentCursor, startDate, 'OPEN');
-  await executeQuery0(projects, currentProjectIndex, currentCursor, startDate, 'CLOSED');
+  const sampleBuckets = getSampleBuckets().map((bucket) => ({
+    ...bucket,
+    since: bucket.since ?? startDate,
+  }));
+
+  for (const bucket of sampleBuckets) {
+    await executeQuery0(
+      projects,
+      currentProjectIndex,
+      currentCursor,
+      bucket.since,
+      bucket.state,
+      bucket.name,
+      bucket.limit
+    );
+  }
 
   const values = Object.values(issues);
+  const repoFullName = `${owner}/${repo}`;
+  const bucketCounts = Object.fromEntries(
+    sampleBuckets.map((bucket) => [
+      bucket.name,
+      tracking[bucketTrackingKey(repoFullName, bucket.name)] ?? 0,
+    ])
+  );
   console.log(
     `[issuesMining] Issue sample collected: repo=${owner}/${repo}, ` +
-    `total=${values.length}, open=${tracking[trackingKey(`${owner}/${repo}`, 'OPEN')]}, ` +
-    `closed=${tracking[trackingKey(`${owner}/${repo}`, 'CLOSED')]}`
+    `total=${values.length}, recentOpen=${bucketCounts.recentOpen ?? 0}, ` +
+    `recentClosed=${bucketCounts.recentClosed ?? 0}, olderClosed=${bucketCounts.olderClosed ?? 0}, ` +
+    `oldOpen=${bucketCounts.oldOpen ?? 0}`
   );
   return values;
 }

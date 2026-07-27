@@ -71,7 +71,7 @@ function buildLeaderboardScore(repo: any) {
 }
 
 async function fetchRepositories(query: string, first: number): Promise<any[]> {
-  const token = process.env.GITHUB_API_TOKEN?.trim();
+  const token = process.env.GITHUB_API_TOKEN?.split(",").map((value) => value.trim()).find(Boolean);
   if (!token) {
     throw new Error("GITHUB_API_TOKEN is required for leaderboard refresh.");
   }
@@ -119,7 +119,7 @@ async function fetchRepositories(query: string, first: number): Promise<any[]> {
 }
 
 async function fetchPackageJson(owner: string, name: string): Promise<string | null> {
-  const token = process.env.GITHUB_API_TOKEN?.trim();
+  const token = process.env.GITHUB_API_TOKEN?.split(",").map((value) => value.trim()).find(Boolean);
   if (!token) return null;
 
   const requestBody = JSON.stringify({
@@ -163,7 +163,15 @@ function parseDependencies(deps: unknown): Record<string, string> {
   return typeof deps === "object" && deps !== null ? (deps as Record<string, string>) : {};
 }
 
-async function createOrUpdateLeaderboardItem(prisma: PrismaClient, repoData: any, category: string, rank: number) {
+type ExploreAnalysisInfo = Awaited<ReturnType<typeof analyzeRepository>>;
+
+async function createOrUpdateLeaderboardItem(
+  prisma: PrismaClient,
+  repoData: any,
+  category: string,
+  rank: number,
+  analysisCache: Map<string, Promise<ExploreAnalysisInfo>>
+) {
   const fullName =
     repoData.fullName ??
     repoData.nameWithOwner ??
@@ -189,7 +197,14 @@ async function createOrUpdateLeaderboardItem(prisma: PrismaClient, repoData: any
     !existing?.analysisId;
 
   const score = shouldCreateAnalysis
-    ? await analyzeRepository(prisma, ownerLogin, repoData.name, packageJsonText)
+    ? await getOrCreateExploreAnalysis({
+        prisma,
+        analysisCache,
+        fullName,
+        owner: ownerLogin,
+        repo: repoData.name,
+        packageJsonText,
+      })
     : null;
   const analysisStatus =
     score?.analysisStatus ??
@@ -243,6 +258,28 @@ async function createOrUpdateLeaderboardItem(prisma: PrismaClient, repoData: any
   }
 }
 
+async function getOrCreateExploreAnalysis(args: {
+  prisma: PrismaClient;
+  analysisCache: Map<string, Promise<ExploreAnalysisInfo>>;
+  fullName: string;
+  owner: string;
+  repo: string;
+  packageJsonText: string;
+}) {
+  const cacheKey = args.fullName.toLowerCase();
+  const cached = args.analysisCache.get(cacheKey);
+  if (cached) return cached;
+
+  const analysisPromise = analyzeRepository(
+    args.prisma,
+    args.owner,
+    args.repo,
+    args.packageJsonText
+  );
+  args.analysisCache.set(cacheKey, analysisPromise);
+  return analysisPromise;
+}
+
 async function analyzeRepository(prisma: PrismaClient, owner: string, name: string, packageJsonText: string) {
   let parsed;
   try {
@@ -280,7 +317,12 @@ async function analyzeRepository(prisma: PrismaClient, owner: string, name: stri
     },
   });
 
-  await enqueueAnalysisJob({ analysisId: analysis.id, owner, repo: name });
+  await enqueueAnalysisJob({
+    analysisId: analysis.id,
+    owner,
+    repo: name,
+    source: "EXPLORE_REFRESH",
+  });
 
   return {
     analysisId: analysis.id,
@@ -330,11 +372,12 @@ async function refreshOnce(prisma: PrismaClient) {
     .sort((a, b) => (b.scores.popularityScore + b.scores.activityScore + b.scores.compatibilityScore) - (a.scores.popularityScore + a.scores.activityScore + a.scores.compatibilityScore))
     .slice(0, DEFAULT_GITHUB_SEARCH_LIMIT)
     .map((entry) => entry.repo);
+  const analysisCache = new Map<string, Promise<ExploreAnalysisInfo>>();
 
   await Promise.all([
-    ...popularRepos.slice(0, popularLimit).map((repo, index) => createOrUpdateLeaderboardItem(prisma, repo, "popular", index + 1)),
-    ...activeRepos.slice(0, 3).map((repo, index) => createOrUpdateLeaderboardItem(prisma, repo, "active", index + 1)),
-    ...bestRankedRepos.slice(0, 3).map((repo, index) => createOrUpdateLeaderboardItem(prisma, repo, "bestRanked", index + 1)),
+    ...popularRepos.slice(0, popularLimit).map((repo, index) => createOrUpdateLeaderboardItem(prisma, repo, "popular", index + 1, analysisCache)),
+    ...activeRepos.slice(0, 3).map((repo, index) => createOrUpdateLeaderboardItem(prisma, repo, "active", index + 1, analysisCache)),
+    ...bestRankedRepos.slice(0, 3).map((repo, index) => createOrUpdateLeaderboardItem(prisma, repo, "bestRanked", index + 1, analysisCache)),
   ]);
 
   console.log("[worker] Explore refresh completed");

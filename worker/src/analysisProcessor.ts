@@ -20,7 +20,13 @@ import type { GitHubMinerInput, GitHubMinerOutput } from "./types/githubMinerTyp
 import type { IssuesMiningMetrics, IssuesMiningResult, IssueSummary } from "./types/issuesMining.types.js";
 import { DependencyAnalysisCacheManager } from "./cache/dependencyAnalysisCache.js";
 import { sendResultEmail } from "./adapters/email.adapter.js";
+import {
+  analyzeDependencyRelationships,
+  type DependencyRelationshipResult,
+} from "./dependencyRelationships.js";
 import { refreshLeaderboardRepositories } from "./leaderboardSync.js";
+import { compactIssueSummariesForStorage } from "./utils/issueDataPersistence.js";
+import { sanitizeJsonValue } from "./utils/jsonSanitizer.js";
 
 type AnalysisResultData = {
   globalScore: number;
@@ -83,6 +89,11 @@ type AnalysisRepository = {
     createMany(args: { data: DependencyScoreCreateData[] }): Promise<unknown>;
     upsert(args: any): Promise<unknown>;
   };
+  dependencyRelationship?: {
+    deleteMany(args: { where: { analysisId: string } }): Promise<unknown>;
+    upsert(args: any): Promise<unknown>;
+  };
+  dependencyRelationshipCache?: any;
   leaderboardRepository?: {
     updateMany(args: any): Promise<unknown>;
   };
@@ -109,6 +120,8 @@ type ProcessorOptions = {
 const DEFAULT_GITHUB_MINER_TIMEOUT_MS = 20000;
 const DEFAULT_ISSUES_MINING_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_ISSUES_MINING_LOOKBACK_DAYS = 60;
+const DEFAULT_RELATIONSHIP_ISSUES_MAX_ISSUES = 80;
+const DEFAULT_RELATIONSHIP_ISSUES_TIMEOUT_MS = 5 * 60 * 1000;
 let dependencyCacheLockClient: Redis | null | undefined;
 
 export async function processAnalysisJob(
@@ -156,6 +169,9 @@ export async function processAnalysisJob(
 
   try {
     logger.log(`[worker] Analysis processing started: analysisId=${analysisId}`);
+    logger.log(
+      `[worker] Analysis dependencies loaded: analysisId=${analysisId}, dependencies=${analysis.dependencies.length}`
+    );
 
     const processingResult = await prisma.analysisResult.upsert({
       where: { analysisId },
@@ -218,6 +234,17 @@ export async function processAnalysisJob(
         );
       },
     });
+    logger.log(
+      `[worker] Dependency enrichment complete: analysisId=${analysisId}, enrichedDependencies=${dependencies.length}`
+    );
+
+    const dependencyRelationships = await analyzeRelationshipsSafely({
+      prisma,
+      analysisId,
+      dependencies,
+      logger,
+      runIssuesMining,
+    });
 
     const runAnalysisPayload: AnalysisJobData & { dependencies: EnrichedDependencyInput[] } = {
       analysisId,
@@ -226,6 +253,9 @@ export async function processAnalysisJob(
     };
 
     const result = await runAnalysis(runAnalysisPayload);
+    logger.log(
+      `[worker] Score aggregation complete: analysisId=${analysisId}, dependencyScores=${result.dependencyScores?.length ?? 0}`
+    );
 
     logger.log(
       `[worker] Saving analysis result: analysisId=${analysisId}, globalScore=${result.globalScore}, riskLevel=${result.riskLevel}`
@@ -258,6 +288,12 @@ export async function processAnalysisJob(
             enrichedDependency,
           });
         })
+      );
+    }
+
+    if (dependencyRelationships.length > 0) {
+      logger.log(
+        `[worker] Dependency relationships saved: analysisId=${analysisId}, relationships=${dependencyRelationships.length}`
       );
     }
 
@@ -577,6 +613,197 @@ async function enrichDependencies(args: {
   return enrichedDependencies;
 }
 
+async function analyzeRelationshipsSafely(args: {
+  prisma: AnalysisRepository;
+  analysisId: string;
+  dependencies: EnrichedDependencyInput[];
+  logger: Pick<Console, "log" | "error">;
+  runIssuesMining: (owner: string, repo: string, sinceDate: string) => Promise<IssuesMiningResult>;
+}) {
+  if (!args.prisma.dependencyRelationship) {
+    args.logger.log("[worker] Dependency relationships unavailable: Prisma delegate not present.");
+    return [];
+  }
+
+  try {
+    const relationshipIssueDataByRepository = new Map<
+      string,
+      Promise<IssueSummary[] | null | undefined>
+    >();
+    const relationshipIssueSampleKey = getRelationshipIssueSampleKey();
+
+    args.logger.log(
+      `[worker] Dependency relationship analysis started: analysisId=${args.analysisId}, dependencies=${args.dependencies.length}, issueSample=${relationshipIssueSampleKey}`
+    );
+    const relationships = await analyzeDependencyRelationships({
+      analysisId: args.analysisId,
+      dependencies: args.dependencies,
+      logger: args.logger,
+      relationshipCache: args.prisma.dependencyRelationshipCache ?? null,
+      issueDataSampleKey: relationshipIssueSampleKey,
+      getIssueData: (source) =>
+        getRelationshipIssueData({
+          source,
+          runIssuesMining: args.runIssuesMining,
+          logger: args.logger,
+          analysisId: args.analysisId,
+          cache: relationshipIssueDataByRepository,
+        }),
+    });
+    await saveDependencyRelationships({
+      prisma: args.prisma,
+      analysisId: args.analysisId,
+      relationships,
+    });
+    args.logger.log(
+      `[worker] Dependency relationship analysis finished: analysisId=${args.analysisId}, relationships=${relationships.length}`
+    );
+    return relationships;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown relationship analysis error";
+    args.logger.error(
+      `[worker] Dependency relationship analysis failed: analysisId=${args.analysisId}, error=${message}`
+    );
+    return [];
+  }
+}
+
+async function getRelationshipIssueData(args: {
+  source: EnrichedDependencyInput & {
+    gitHubMetrics: NonNullable<EnrichedDependencyInput["gitHubMetrics"]>;
+  };
+  runIssuesMining: (owner: string, repo: string, sinceDate: string) => Promise<IssuesMiningResult>;
+  logger: Pick<Console, "log" | "error">;
+  analysisId: string;
+  cache: Map<string, Promise<IssueSummary[] | null | undefined>>;
+}) {
+  if (process.env.DEPENDENCY_RELATIONSHIP_DEEP_ISSUES_ENABLED === "false") {
+    return args.source.issueData ?? null;
+  }
+
+  const repository = args.source.gitHubMetrics.repository;
+  const repositoryKey = repository.fullName.toLowerCase();
+  const cached = args.cache.get(repositoryKey);
+  if (cached) return cached;
+
+  const samplePromise = runRelationshipIssuesMining({
+    owner: repository.owner,
+    repo: repository.name,
+    fullName: repository.fullName,
+    runIssuesMining: args.runIssuesMining,
+    logger: args.logger,
+    analysisId: args.analysisId,
+    fallbackIssueData: args.source.issueData ?? null,
+  });
+  args.cache.set(repositoryKey, samplePromise);
+  return samplePromise;
+}
+
+async function runRelationshipIssuesMining(args: {
+  owner: string;
+  repo: string;
+  fullName: string;
+  runIssuesMining: (owner: string, repo: string, sinceDate: string) => Promise<IssuesMiningResult>;
+  logger: Pick<Console, "log" | "error">;
+  analysisId: string;
+  fallbackIssueData: IssueSummary[] | null;
+}) {
+  const maxIssues = getRelationshipIssuesMaxIssues();
+  const sinceDate = getRelationshipIssuesSinceDate();
+  args.logger.log(
+    `[worker] Relationship issueMining started: analysisId=${args.analysisId}, repo=${args.fullName}, maxIssues=${maxIssues}, sinceDate=${sinceDate}`
+  );
+
+  try {
+    const result = await withTimeout(
+      withTemporaryEnv(
+        {
+          ISSUES_MINING_MAX_ISSUES: String(maxIssues),
+          ISSUES_MINING_MAX_OPEN_ISSUES:
+            process.env.DEPENDENCY_RELATIONSHIP_MAX_OPEN_ISSUES,
+          ISSUES_MINING_MAX_CLOSED_ISSUES:
+            process.env.DEPENDENCY_RELATIONSHIP_MAX_CLOSED_ISSUES,
+        },
+        () => args.runIssuesMining(args.owner, args.repo, sinceDate)
+      ),
+      getConfiguredTimeout(
+        "DEPENDENCY_RELATIONSHIP_ISSUES_TIMEOUT_MS",
+        DEFAULT_RELATIONSHIP_ISSUES_TIMEOUT_MS
+      ),
+      `relationship issueMining timed out for ${args.fullName}`
+    );
+
+    const issueData = result.issueData ?? args.fallbackIssueData ?? [];
+    args.logger.log(
+      `[worker] Relationship issueMining finished: analysisId=${args.analysisId}, repo=${args.fullName}, status=${result.status}, sampledIssues=${issueData.length}, totalIssues=${result.metrics.totalIssuesAnalyzed}`
+    );
+
+    if (result.status !== "SUCCESS") {
+      args.logger.error(
+        `[worker] Relationship issueMining incomplete: analysisId=${args.analysisId}, repo=${args.fullName}, error=${result.error ?? "unknown"}`
+      );
+    }
+
+    return issueData;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown relationship issueMining error";
+    args.logger.error(
+      `[worker] Relationship issueMining failed: analysisId=${args.analysisId}, repo=${args.fullName}, error=${message}`
+    );
+    return args.fallbackIssueData ?? [];
+  }
+}
+
+async function saveDependencyRelationships(args: {
+  prisma: AnalysisRepository;
+  analysisId: string;
+  relationships: DependencyRelationshipResult[];
+}) {
+  if (!args.prisma.dependencyRelationship) return;
+
+  await args.prisma.dependencyRelationship.deleteMany({
+    where: { analysisId: args.analysisId },
+  });
+  console.log(
+    `[worker] Existing dependency relationships cleared: analysisId=${args.analysisId}`
+  );
+
+  await Promise.all(
+    args.relationships.map((relationship) =>
+      args.prisma.dependencyRelationship!.upsert({
+        where: {
+          analysisId_sourceDependencyId_targetDependencyId: {
+            analysisId: relationship.analysisId,
+            sourceDependencyId: relationship.sourceDependencyId,
+            targetDependencyId: relationship.targetDependencyId,
+          },
+        },
+        create: {
+          analysisId: relationship.analysisId,
+          sourceDependencyId: relationship.sourceDependencyId,
+          targetDependencyId: relationship.targetDependencyId,
+          relationshipType: relationship.relationshipType,
+          confidence: relationship.confidence,
+          riskAdjustment: relationship.riskAdjustment,
+          summary: relationship.summary,
+          evidence: relationship.evidence,
+        },
+        update: {
+          relationshipType: relationship.relationshipType,
+          confidence: relationship.confidence,
+          riskAdjustment: relationship.riskAdjustment,
+          summary: relationship.summary,
+          evidence: relationship.evidence,
+        },
+      })
+    )
+  );
+  console.log(
+    `[worker] Dependency relationships persisted: analysisId=${args.analysisId}, relationships=${args.relationships.length}`
+  );
+}
+
 function createDefaultCacheManager(
   prisma: AnalysisRepository,
   logger: Pick<Console, "log" | "error">
@@ -727,11 +954,13 @@ function buildDependencyScoreCreateData(args: {
     maintenanceScore: args.dependencyScore.breakdown?.maintenanceScore ?? null,
     resolutionQualityScore:
       args.dependencyScore.breakdown?.resolutionQualityScore ?? null,
-    normalizedInputs: args.dependencyScore.breakdown?.normalizedInputs ?? null,
-    githubMetrics: args.enrichedDependency.gitHubMetrics ?? null,
-    issueMetrics: args.enrichedDependency.issueMetrics ?? null,
-    issueData: args.enrichedDependency.issueData ?? null,
-    warnings: args.dependencyScore.warnings ?? [],
+    normalizedInputs: sanitizeJsonValue(args.dependencyScore.breakdown?.normalizedInputs ?? null),
+    githubMetrics: sanitizeJsonValue(args.enrichedDependency.gitHubMetrics ?? null),
+    issueMetrics: sanitizeJsonValue(args.enrichedDependency.issueMetrics ?? null),
+    issueData: sanitizeJsonValue(
+      compactIssueSummariesForStorage(args.enrichedDependency.issueData)
+    ),
+    warnings: sanitizeJsonValue(args.dependencyScore.warnings ?? []),
   };
 }
 
@@ -749,6 +978,40 @@ function getIssuesSinceDate() {
   return date.toISOString().split("T")[0]!;
 }
 
+function getRelationshipIssuesSinceDate() {
+  const date = new Date();
+  const lookbackDays = positiveInteger(
+    process.env.DEPENDENCY_RELATIONSHIP_ISSUES_LOOKBACK_DAYS ??
+      process.env.ISSUES_MINING_LOOKBACK_DAYS,
+    DEFAULT_ISSUES_MINING_LOOKBACK_DAYS
+  );
+  date.setDate(date.getDate() - lookbackDays);
+  return date.toISOString().split("T")[0]!;
+}
+
+function getRelationshipIssuesMaxIssues() {
+  return positiveInteger(
+    process.env.DEPENDENCY_RELATIONSHIP_ISSUES_MAX_ISSUES,
+    DEFAULT_RELATIONSHIP_ISSUES_MAX_ISSUES
+  );
+}
+
+function getRelationshipIssueSampleKey() {
+  if (process.env.DEPENDENCY_RELATIONSHIP_DEEP_ISSUES_ENABLED === "false") {
+    return "score-sample";
+  }
+
+  return [
+    "deep-issuemining",
+    `max=${getRelationshipIssuesMaxIssues()}`,
+    `lookback=${positiveInteger(
+      process.env.DEPENDENCY_RELATIONSHIP_ISSUES_LOOKBACK_DAYS ??
+        process.env.ISSUES_MINING_LOOKBACK_DAYS,
+      DEFAULT_ISSUES_MINING_LOOKBACK_DAYS
+    )}`,
+  ].join(":");
+}
+
 function shouldMineIssuesForDependency(dependency: DependencyInput) {
   if (dependency.type !== "DEV_DEPENDENCY") return true;
   return process.env.ISSUES_MINING_INCLUDE_DEV_DEPENDENCIES !== "false";
@@ -757,6 +1020,40 @@ function shouldMineIssuesForDependency(dependency: DependencyInput) {
 function getConfiguredTimeout(name: string, defaultValue: number) {
   const configured = Number(process.env[name] ?? defaultValue);
   return Number.isFinite(configured) && configured > 0 ? configured : defaultValue;
+}
+
+function positiveInteger(value: string | number | undefined, defaultValue: number) {
+  const configured = Number(value ?? defaultValue);
+  return Number.isFinite(configured) && configured > 0
+    ? Math.floor(configured)
+    : defaultValue;
+}
+
+async function withTemporaryEnv<T>(
+  updates: Record<string, string | undefined>,
+  run: () => Promise<T>
+): Promise<T> {
+  const previous = new Map<string, string | undefined>();
+  for (const [key, value] of Object.entries(updates)) {
+    previous.set(key, process.env[key]);
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+
+  try {
+    return await run();
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {

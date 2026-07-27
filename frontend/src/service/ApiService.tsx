@@ -48,6 +48,33 @@ export interface AnalysisLookupResponse {
       versionRequirement: string;
       type: "DEPENDENCY" | "DEV_DEPENDENCY";
     }>;
+    dependencyRelationships: Array<{
+      id: string;
+      analysisId: string;
+      sourceDependencyId: string;
+      targetDependencyId: string;
+      relationshipType:
+        | "KNOWN_INCOMPATIBILITY"
+        | "POSSIBLE_CONFLICT"
+        | "INTEGRATION_MENTION"
+        | "UNKNOWN";
+      confidence: "HIGH" | "MEDIUM" | "LOW";
+      riskAdjustment: number;
+      summary: string;
+      evidence?: unknown;
+      sourceDependency: {
+        id: string;
+        name: string;
+        versionRequirement: string;
+        type: "DEPENDENCY" | "DEV_DEPENDENCY";
+      };
+      targetDependency: {
+        id: string;
+        name: string;
+        versionRequirement: string;
+        type: "DEPENDENCY" | "DEV_DEPENDENCY";
+      };
+    }>;
     result: AnalysisResult | null;
   };
 }

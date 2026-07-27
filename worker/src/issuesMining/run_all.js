@@ -20,7 +20,7 @@ export async function analyzeIssues(owner, repo, startDate) {
   };
 }
 
-if (process.argv[1].endsWith('run_all.js')) {
+if (process.argv[1]?.endsWith('run_all.js')) {
   if (process.argv.length < 5) {
     console.error("Usage: node run_all.js <owner> <repo> <start_date>");
     process.exit(1);

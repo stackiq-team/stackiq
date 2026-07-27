@@ -8,14 +8,16 @@ export function Header() {
     return (
         <header className="navbar">
             <div className="nav-left">
-            <div className="logo">StackIQ</div>
+            <button className="logo-button" onClick={() => navigate('/')}>
+                <span className="logo-mark">S</span>
+                <span className="logo">StackIQ</span>
+            </button>
             <nav className="nav-links">
-                <button className={location.pathname === '/' ? 'active' : ''} onClick={() => navigate('/')}>Home Page</button>
+                <button className={location.pathname === '/' ? 'active' : ''} onClick={() => navigate('/')}>Analyze</button>
                 <button className={location.pathname.startsWith('/explore') || location.pathname === '/leaderboard' ? 'active' : ''} onClick={() => navigate('/explore')}>Explore</button>
             </nav>
             </div>
-            <div className="nav-right">
-            </div>
+            <div className="nav-right" />
         </header>
     );
 }

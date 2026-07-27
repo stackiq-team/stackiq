@@ -36,7 +36,7 @@ const repositoryPackageJsonQuery = `
 `;
 
 function getGitHubToken(): string {
-  const token = process.env.GITHUB_API_TOKEN?.trim();
+  const token = process.env.GITHUB_API_TOKEN?.split(",").map((value) => value.trim()).find(Boolean);
   if (!token) {
     throw new Error("GITHUB_API_TOKEN is required to fetch repository package.json.");
   }
@@ -181,6 +181,7 @@ router.post("/repository", async (req: Request, res: Response) => {
       email: email ?? undefined,
       owner,
       repo,
+      source: "USER_REPOSITORY",
     });
 
     return res.status(200).json({ message: "Success", analysis });
@@ -216,6 +217,16 @@ router.get("/:resultToken", async (req: Request, res: Response) => {
               orderBy: { dependency: { name: "asc" } },
             },
           },
+        },
+        dependencyRelationships: {
+          include: {
+            sourceDependency: true,
+            targetDependency: true,
+          },
+          orderBy: [
+            { sourceDependency: { name: "asc" } },
+            { targetDependency: { name: "asc" } },
+          ],
         },
       },
     });
@@ -340,6 +351,7 @@ router.post(
       const job = await enqueueAnalysisJob({
         analysisId: analysis.id,
         email: analysis.email || undefined,
+        source: "USER_UPLOAD",
       });
 
       console.log(

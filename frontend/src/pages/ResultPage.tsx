@@ -8,6 +8,7 @@ type AnalysisStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 type DependencyEntry = AnalysisLookupResponse["analysis"]["dependencies"][number];
 type ScoreEntry = NonNullable<AnalysisLookupResponse["analysis"]["result"]>["dependencyScores"][number];
+type RelationshipEntry = AnalysisLookupResponse["analysis"]["dependencyRelationships"][number];
 
 const statusLabels: Record<AnalysisStatus, string> = {
   PENDING: "Pending",
@@ -81,11 +82,40 @@ function getGithubMetrics(score?: ScoreEntry) {
     stars: typeof metrics?.stars === "number" ? metrics.stars : null,
     watchers: typeof metrics?.watchers === "number" ? metrics.watchers : null,
     forks: typeof metrics?.forks === "number" ? metrics.forks : null,
+    repositoryIssues: typeof metrics?.issues === "number" ? metrics.issues : null,
+    pullRequests: typeof metrics?.pullRequests === "number" ? metrics.pullRequests : null,
+    contributors: typeof metrics?.contributors === "number" ? metrics.contributors : null,
     openIssues:
       typeof issueMetrics?.openIssues === "number" ? issueMetrics.openIssues : null,
     closedIssues:
       typeof issueMetrics?.closedIssues === "number" ? issueMetrics.closedIssues : null,
   };
+}
+
+function countRelationshipRisks(relationships: RelationshipEntry[]) {
+  return {
+    known: relationships.filter((item) => item.relationshipType === "KNOWN_INCOMPATIBILITY").length,
+    possible: relationships.filter((item) => item.relationshipType === "POSSIBLE_CONFLICT").length,
+    mentions: relationships.filter((item) => item.relationshipType === "INTEGRATION_MENTION").length,
+  };
+}
+
+function relationshipSummaryLabel(
+  counts: ReturnType<typeof countRelationshipRisks>,
+  analysisStatus: AnalysisStatus,
+  relationshipCount: number
+) {
+  if (analysisStatus !== "COMPLETED") return "Analysis pending";
+  if (relationshipCount === 0) return "Not checked yet";
+
+  const riskCount = counts.known + counts.possible;
+  const signalCount = riskCount + counts.mentions;
+
+  if (signalCount === 0) return "No signals found";
+  if (riskCount > 0) {
+    return `${riskCount} ${riskCount === 1 ? "risk" : "risks"} found`;
+  }
+  return `${counts.mentions} ${counts.mentions === 1 ? "mention" : "mentions"} found`;
 }
 
 function formatMetric(value: number | null | undefined) {
@@ -173,6 +203,10 @@ function DependencyTable({
             const score = scoresByDependencyId.get(dependency.id);
             const repositoryUrl = getRepositoryUrl(score);
             const githubMetrics = getGithubMetrics(score);
+            const dependencyRelationships = analysis.dependencyRelationships.filter(
+              (relationship) => relationship.sourceDependencyId === dependency.id
+            );
+            const relationshipCounts = countRelationshipRisks(dependencyRelationships);
             const isExpanded = Boolean(expandedDependencies[dependency.id]);
             const viewMoreLink = `/results/${analysis.resultToken}/dependency/${encodeURIComponent(dependency.name)}`;
 
@@ -228,36 +262,42 @@ function DependencyTable({
                   <tr className="dependency-expanded-row">
                     <td colSpan={8}>
                       <div className="dependency-expanded-panel">
-                        <div className="dependency-expanded-grid">
-                          <article className="dependency-mini-card">
-                            <h3>Useful Info</h3>
-                            <ul>
-                              <li><strong>Version:</strong> {dependency.versionRequirement}</li>
-                              <li><strong>Type:</strong> {dependency.type}</li>
-                              <li><strong>Status:</strong> <DependencyStatusBadge analysisStatus={analysis.status} score={score} /></li>
-                              <li><strong>Score:</strong> {score?.score ?? "-"}</li>
-                              <li><strong>Risk:</strong> {score?.riskLevel ?? "-"}</li>
-                            </ul>
-                          </article>
-
-                          <article className="dependency-mini-card">
-                            <h3>GitHub Metrics</h3>
-                            <ul>
-                              <li><strong>Stars:</strong> {formatMetric(githubMetrics.stars)}</li>
-                              <li><strong>Watchers:</strong> {formatMetric(githubMetrics.watchers)}</li>
-                              <li><strong>Forks:</strong> {formatMetric(githubMetrics.forks)}</li>
-                              <li><strong>Open issues:</strong> {formatMetric(githubMetrics.openIssues)}</li>
-                              <li><strong>Closed issues:</strong> {formatMetric(githubMetrics.closedIssues)}</li>
-                            </ul>
-                          </article>
-
-                          <article className="dependency-mini-card dependency-mini-card-action">
-                            <h3>Next Step</h3>
-                            <p>Open the dependency detail page for a fuller breakdown and all available metrics.</p>
-                            <Link className="button button-secondary dependency-view-more" to={viewMoreLink}>
-                              View more...
-                            </Link>
-                          </article>
+                        <div className="dependency-detail-strip">
+                          <div className="strip-group strip-group-primary">
+                            <span>Version</span>
+                            <strong>{dependency.versionRequirement}</strong>
+                          </div>
+                          <div className="strip-group">
+                            <span>Stars</span>
+                            <strong>{formatMetric(githubMetrics.stars)}</strong>
+                          </div>
+                          <div className="strip-group">
+                            <span>Forks</span>
+                            <strong>{formatMetric(githubMetrics.forks)}</strong>
+                          </div>
+                          <div className="strip-group">
+                            <span>Repo issues</span>
+                            <strong>{formatMetric(githubMetrics.repositoryIssues)}</strong>
+                          </div>
+                          <div className="strip-group strip-group-wide">
+                            <span>Relationships</span>
+                            <strong>
+                              {relationshipSummaryLabel(
+                                relationshipCounts,
+                                analysis.status,
+                                dependencyRelationships.length
+                              )}
+                            </strong>
+                          </div>
+                          <div className="strip-group strip-group-wide">
+                            <span>Sampled issues</span>
+                            <strong>
+                              {formatMetric(githubMetrics.openIssues)} open · {formatMetric(githubMetrics.closedIssues)} closed
+                            </strong>
+                          </div>
+                          <Link className="dependency-strip-link" to={viewMoreLink}>
+                            Open details
+                          </Link>
                         </div>
                       </div>
                     </td>
@@ -367,11 +407,17 @@ export default function ResultPage() {
       ? analysis.updatedAt
       : null;
   const analysisDuration = formatDuration(analysis.createdAt, durationEnd);
+  const relationshipCounts = countRelationshipRisks(analysis.dependencyRelationships);
+  const totalRelationshipSignals =
+    relationshipCounts.known + relationshipCounts.possible + relationshipCounts.mentions;
 
   return (
     <section className="result-page">
       <header className="result-header">
-        <h1>Analysis Result</h1>
+        <div>
+          <p className="result-kicker">Stack analysis</p>
+          <h1>Analysis Result</h1>
+        </div>
         <span className={`status-badge status-${analysis.status.toLowerCase()}`}>
           {statusLabels[analysis.status]}
         </span>
@@ -401,6 +447,10 @@ export default function ResultPage() {
             <article className="summary-card">
               <h2>Total Time</h2>
               <p>{analysisDuration}</p>
+            </article>
+            <article className="summary-card">
+              <h2>Relationship Signals</h2>
+              <p>{totalRelationshipSignals}</p>
             </article>
           </div>
 

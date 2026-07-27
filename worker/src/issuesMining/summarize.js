@@ -35,6 +35,22 @@ function extractFirstAssignedAt(items) {
   return null;
 }
 
+function extractFirstMaintainerResponseAt(items) {
+  const maintainerAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+
+  for (const { node } of items) {
+    if (
+      node.__typename === 'IssueComment' &&
+      node.createdAt &&
+      maintainerAssociations.has(node.authorAssociation)
+    ) {
+      return node.createdAt;
+    }
+  }
+
+  return null;
+}
+
 function extractHasConnectedEvent(items) {
   return items.some(({ node }) => node.__typename === 'ConnectedEvent');
 }
@@ -66,14 +82,24 @@ function extractTooManyTimelineItems(node, items) {
 function summarizeIssue(node) {
   const items = node.items?.edges ?? [];
   const timelineStatus = extractTooManyTimelineItems(node, items);
+  const body = node.bodyText ?? node.body ?? '';
+  const labels = node.labels?.edges?.map((edge) => edge.node?.name).filter(Boolean)
+    ?? node.labels?.nodes?.map((label) => label.name).filter(Boolean)
+    ?? [];
 
   return {
     number: node.number,
+    title: node.title ?? null,
+    url: node.url ?? null,
+    bodyPreview: body ? body.slice(0, 1000) : null,
+    labels,
     publishedAt: node.publishedAt,
     closedAt: node.closedAt,
     closed: node.closed,
     assigneesCount: node.assignees?.totalCount ?? 0,
     firstAssignedAt: extractFirstAssignedAt(items),
+    firstMaintainerResponseAt: extractFirstMaintainerResponseAt(items),
+    sampleBucket: node.sampleBucket ?? null,
     closer: extractCloser(items),
     hasConnectedEvent: extractHasConnectedEvent(items),
     hasPostCloseActivity: extractHasPostCloseActivity(items, node.closedAt),
