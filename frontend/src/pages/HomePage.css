@@ -238,6 +238,14 @@
   padding-top: 16px;
 }
 
+.scanner-action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .submit-help {
   max-width: 460px;
   margin: 0;
@@ -330,6 +338,11 @@
   .scanner-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .scanner-action-buttons {
+    justify-content: flex-start;
+    margin-left: 0;
   }
 
   .submit-help {

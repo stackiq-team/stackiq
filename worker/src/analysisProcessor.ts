@@ -238,14 +238,6 @@ export async function processAnalysisJob(
       `[worker] Dependency enrichment complete: analysisId=${analysisId}, enrichedDependencies=${dependencies.length}`
     );
 
-    const dependencyRelationships = await analyzeRelationshipsSafely({
-      prisma,
-      analysisId,
-      dependencies,
-      logger,
-      runIssuesMining,
-    });
-
     const runAnalysisPayload: AnalysisJobData & { dependencies: EnrichedDependencyInput[] } = {
       analysisId,
       dependencies,
@@ -291,12 +283,6 @@ export async function processAnalysisJob(
       );
     }
 
-    if (dependencyRelationships.length > 0) {
-      logger.log(
-        `[worker] Dependency relationships saved: analysisId=${analysisId}, relationships=${dependencyRelationships.length}`
-      );
-    }
-
     logger.log(
       `[worker] Analysis result saved: analysisId=${analysisId}, dependencyScores=${dependencyScores.length}`
     );
@@ -315,32 +301,6 @@ export async function processAnalysisJob(
       );
     }
 
-    logger.log(
-      `[worker] Sending result email: analysisId=${analysisId}, globalScore=${result.globalScore}, email=${email ?? "none"}`
-    );
-
-    if (email) {
-      const dependencyScores = result.dependencyScores?.map((dependencyScore) => {
-        const enrichedDependency = dependencies.find(
-          (item) => item.dependency.id === dependencyScore.dependencyId
-        );
-
-        return {
-          ...dependencyScore,
-          dependencyName: enrichedDependency?.dependency.name,
-        };
-      });
-
-      const emailResult: AnalysisResultData = {
-        ...result,
-        ...(dependencyScores ? { dependencyScores } : {}),
-      };
-
-      await sendResultEmail(emailResult, email, analysis.resultToken ?? "");
-    } else {
-      logger.log(`[worker] No email provided for analysis: analysisId=${analysisId}`);
-    }
-
     logger.log(`[worker] Updating analysis to COMPLETED: analysisId=${analysisId}`);
 
     await prisma.analysis.update({
@@ -351,6 +311,29 @@ export async function processAnalysisJob(
       },
     });
     logger.log(`[worker] Analysis status updated: analysisId=${analysisId}, status=COMPLETED`);
+
+    await sendResultEmailSafely({
+      email,
+      result,
+      dependencies,
+      resultToken: analysis.resultToken ?? "",
+      analysisId,
+      logger,
+    });
+
+    const dependencyRelationships = await analyzeRelationshipsSafely({
+      prisma,
+      analysisId,
+      dependencies,
+      logger,
+      runIssuesMining,
+    });
+
+    if (dependencyRelationships.length > 0) {
+      logger.log(
+        `[worker] Dependency relationships saved after completion: analysisId=${analysisId}, relationships=${dependencyRelationships.length}`
+      );
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown worker error";
 
@@ -390,6 +373,49 @@ async function defaultRunIssuesMining(
   sinceDate: string
 ): Promise<IssuesMiningResult> {
   return runIssuesMining(owner, repo, sinceDate);
+}
+
+async function sendResultEmailSafely(args: {
+  email: string | null | undefined;
+  result: AnalysisResultData;
+  dependencies: EnrichedDependencyInput[];
+  resultToken: string;
+  analysisId: string;
+  logger: Pick<Console, "log" | "error">;
+}) {
+  args.logger.log(
+    `[worker] Sending result email: analysisId=${args.analysisId}, globalScore=${args.result.globalScore}, email=${args.email ?? "none"}`
+  );
+
+  if (!args.email) {
+    args.logger.log(`[worker] No email provided for analysis: analysisId=${args.analysisId}`);
+    return;
+  }
+
+  try {
+    const dependencyScores = args.result.dependencyScores?.map((dependencyScore) => {
+      const enrichedDependency = args.dependencies.find(
+        (item) => item.dependency.id === dependencyScore.dependencyId
+      );
+
+      return {
+        ...dependencyScore,
+        dependencyName: enrichedDependency?.dependency.name,
+      };
+    });
+
+    const emailResult: AnalysisResultData = {
+      ...args.result,
+      ...(dependencyScores ? { dependencyScores } : {}),
+    };
+
+    await sendResultEmail(emailResult, args.email, args.resultToken);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown email error";
+    args.logger.error(
+      `[worker] Failed to send result email after completion: analysisId=${args.analysisId}, error=${message}`
+    );
+  }
 }
 
 async function enrichDependencies(args: {

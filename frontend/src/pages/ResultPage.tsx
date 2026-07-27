@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchAnalysisByResultToken } from "../service/ApiService";
 import type { AnalysisLookupResponse } from "../service/ApiService";
+import { exportFullStackReport } from "../reporting/fullStackReport";
 import "./ResultPage.css";
 
 type AnalysisStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
@@ -39,6 +40,24 @@ function formatDuration(start: string, end?: string | null) {
 
   if (minutes === 0) return `${seconds}s`;
   return `${minutes}m ${seconds}s`;
+}
+
+function getScoreCompletionTime(analysis: AnalysisLookupResponse["analysis"]) {
+  const scoreTimes =
+    analysis.result?.dependencyScores
+      .map((score) => getRecord(score)?.updatedAt)
+      .filter((value): value is string => typeof value === "string" && value.trim() !== "") ?? [];
+
+  if (scoreTimes.length === 0) return analysis.updatedAt;
+
+  return scoreTimes.reduce((latest, value) => {
+    const latestMs = new Date(latest).getTime();
+    const valueMs = new Date(value).getTime();
+
+    if (Number.isNaN(valueMs)) return latest;
+    if (Number.isNaN(latestMs)) return value;
+    return valueMs > latestMs ? value : latest;
+  }, scoreTimes[0]!);
 }
 
 function getRecord(value: unknown): Record<string, unknown> | null {
@@ -404,7 +423,7 @@ export default function ResultPage() {
   const completedResult = analysis.status === "COMPLETED" ? analysis.result : null;
   const durationEnd =
     analysis.status === "COMPLETED" || analysis.status === "FAILED"
-      ? analysis.updatedAt
+      ? getScoreCompletionTime(analysis)
       : null;
   const analysisDuration = formatDuration(analysis.createdAt, durationEnd);
   const relationshipCounts = countRelationshipRisks(analysis.dependencyRelationships);
@@ -494,6 +513,12 @@ export default function ResultPage() {
       )}
 
       <div className="result-actions">
+        <button
+          className="button"
+          onClick={() => exportFullStackReport(analysis)}
+        >
+          Export PDF
+        </button>
         <button
           className="button"
           disabled={refreshing}

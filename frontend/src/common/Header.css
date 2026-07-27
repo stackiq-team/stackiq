@@ -120,3 +120,30 @@
         display: none;
     }
 }
+
+@media (max-width: 430px) {
+    .navbar {
+        height: auto;
+        min-height: 64px;
+        padding: 10px 14px;
+    }
+
+    .nav-left {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+    }
+
+    .logo-button {
+        flex: 0 0 auto;
+    }
+
+    .nav-links {
+        flex: 1 1 auto;
+        justify-content: flex-start;
+    }
+
+    .nav-links button {
+        padding: 7px 9px;
+    }
+}
