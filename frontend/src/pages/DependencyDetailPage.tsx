@@ -7,6 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 type DetailTab = "signals" | "score" | "relationships" | "issues";
+type IssueChartView = "activity" | "insights";
 type ScoreEntry = NonNullable<AnalysisLookupResponse["analysis"]["result"]>["dependencyScores"][number];
 type RelationshipEntry = AnalysisLookupResponse["analysis"]["dependencyRelationships"][number];
 
@@ -235,6 +236,8 @@ function getIssueSummary(value: unknown) {
     wasReclassified: closer.wasReclassified === true,
     hasConnectedEvent: record.hasConnectedEvent === true,
     hasPostCloseActivity: record.hasPostCloseActivity === true,
+    firstMaintainerResponseAt: getStringValue(record.firstMaintainerResponseAt),
+    sampleBucket: getStringValue(record.sampleBucket),
     tooManyTimelineItems: record.tooManyTimelineItems === true,
     timelineTotalCount: typeof record.timelineTotalCount === "number" ? record.timelineTotalCount : null,
     timelineCapturedCount: typeof record.timelineCapturedCount === "number" ? record.timelineCapturedCount : null,
@@ -380,11 +383,11 @@ function buildPostCloseActivityData(summaries: IssueSummary[]) {
 
 function computeTriageSpeedStats(summaries: IssueSummary[]) {
   const days = summaries
-    .filter((s) => s.publishedAt && s.firstAssignedAt)
+    .filter((s) => s.publishedAt && (s.firstMaintainerResponseAt || s.firstAssignedAt))
     .map((s) => {
       const opened = new Date(s.publishedAt as string).getTime();
-      const assigned = new Date(s.firstAssignedAt as string).getTime();
-      return (assigned - opened) / (1000 * 60 * 60 * 24);
+      const response = new Date((s.firstMaintainerResponseAt ?? s.firstAssignedAt) as string).getTime();
+      return (response - opened) / (1000 * 60 * 60 * 24);
     })
     .filter((d) => d >= 0);
 
@@ -396,6 +399,77 @@ function computeTriageSpeedStats(summaries: IssueSummary[]) {
   const average = sorted.reduce((sum, d) => sum + d, 0) / sorted.length;
 
   return { median: Math.round(median * 10) / 10, average: Math.round(average * 10) / 10 };
+}
+
+function daysBetween(start: string | null, end: string | null) {
+  if (!start || !end) return null;
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) return null;
+  return (endMs - startMs) / (1000 * 60 * 60 * 24);
+}
+
+function bucketCounts<T extends string>(labels: T[]) {
+  return new Map<T, number>(labels.map((label) => [label, 0]));
+}
+
+function buildDurationDistributionData(
+  summaries: IssueSummary[],
+  getDays: (summary: IssueSummary) => number | null
+) {
+  const labels = ["0-7", "7-30", "30-90", "90+"] as const;
+  const counts = bucketCounts([...labels]);
+
+  summaries.forEach((summary) => {
+    const days = getDays(summary);
+    if (days === null) return;
+    if (days < 7) counts.set("0-7", (counts.get("0-7") ?? 0) + 1);
+    else if (days < 30) counts.set("7-30", (counts.get("7-30") ?? 0) + 1);
+    else if (days < 90) counts.set("30-90", (counts.get("30-90") ?? 0) + 1);
+    else counts.set("90+", (counts.get("90+") ?? 0) + 1);
+  });
+
+  return labels.map((bucket) => ({ bucket, count: counts.get(bucket) ?? 0 }));
+}
+
+function isHealthyClosure(summary: IssueSummary) {
+  if (!summary.closed) return false;
+  if (summary.closerType === "PullRequest" || summary.closerType === "Commit") return true;
+  return ["COMPLETED", "DUPLICATE", "NOT_PLANNED"].includes(summary.stateReason ?? "");
+}
+
+function buildResolutionFunnelData(summaries: IssueSummary[]) {
+  const closed = summaries.filter((summary) => summary.closed);
+  const healthy = closed.filter(isHealthyClosure);
+  const codeLinked = closed.filter(
+    (summary) => summary.closerType === "PullRequest" || summary.closerType === "Commit"
+  );
+
+  return [
+    { stage: "Sampled", count: summaries.length },
+    { stage: "Closed", count: closed.length },
+    { stage: "Healthy", count: healthy.length },
+    { stage: "Code-linked", count: codeLinked.length },
+  ];
+}
+
+function buildBacklogHealthData(summaries: IssueSummary[]) {
+  const labels = ["Recent open", "Aging open", "Stale open"] as const;
+  const counts = bucketCounts([...labels]);
+  const now = Date.now();
+
+  summaries
+    .filter((summary) => !summary.closed && summary.publishedAt)
+    .forEach((summary) => {
+      const openedAt = new Date(summary.publishedAt as string).getTime();
+      if (Number.isNaN(openedAt)) return;
+      const ageDays = (now - openedAt) / (1000 * 60 * 60 * 24);
+      if (ageDays < 30) counts.set("Recent open", (counts.get("Recent open") ?? 0) + 1);
+      else if (ageDays < 180) counts.set("Aging open", (counts.get("Aging open") ?? 0) + 1);
+      else counts.set("Stale open", (counts.get("Stale open") ?? 0) + 1);
+    });
+
+  return labels.map((bucket) => ({ bucket, count: counts.get(bucket) ?? 0 }));
 }
 
 export default function DependencyDetailPage() {
@@ -411,6 +485,7 @@ export default function DependencyDetailPage() {
   const [selectedCloseReason, setSelectedCloseReason] = useState<string | null>(null);
   const [selectedPostCloseActivity, setSelectedPostCloseActivity] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("signals");
+  const [issueChartView, setIssueChartView] = useState<IssueChartView>("activity");
 
   const load = async () => {
     if (!resultToken || !dependencyName) {
@@ -544,6 +619,14 @@ export default function DependencyDetailPage() {
   const activityBucketData = buildActivityBucketData(issueSummaries);
   const closeReasonData = buildCloseReasonData(issueSummaries);
   const postCloseActivityData = buildPostCloseActivityData(issueSummaries);
+  const resolutionFunnelData = buildResolutionFunnelData(issueSummaries);
+  const backlogHealthData = buildBacklogHealthData(issueSummaries);
+  const resolutionDistributionData = buildDurationDistributionData(issueSummaries, (summary) =>
+    summary.closed ? daysBetween(summary.publishedAt, summary.closedAt) : null
+  );
+  const responseDistributionData = buildDurationDistributionData(issueSummaries, (summary) =>
+    daysBetween(summary.publishedAt, summary.firstMaintainerResponseAt ?? summary.firstAssignedAt)
+  );
   const filteredIssueSummaries = issueSummaries.filter((summary) => {
     const weekMatch =
       !selectedWeek ||
@@ -1175,9 +1258,30 @@ export default function DependencyDetailPage() {
                 </button>
               )}
         </h2>
+        <div className="issue-chart-toggle" role="tablist" aria-label="Issue chart views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={issueChartView === "activity"}
+            className={`issue-chart-toggle-button ${issueChartView === "activity" ? "is-active" : ""}`}
+            onClick={() => setIssueChartView("activity")}
+          >
+            Activity
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={issueChartView === "insights"}
+            className={`issue-chart-toggle-button ${issueChartView === "insights" ? "is-active" : ""}`}
+            onClick={() => setIssueChartView("insights")}
+          >
+            Score insights
+          </button>
+        </div>
         <div className="github-metrics">
 
-
+          {issueChartView === "activity" ? (
+          <>
           <div className="metric-placeholder metric-placeholder-wide">
             <div className="chart-grid">
               <div className="metric-placeholder">
@@ -1340,6 +1444,104 @@ export default function DependencyDetailPage() {
               </ResponsiveContainer>
             </div>
           </div>
+          </>
+          ) : (
+          <>
+          <div className="metric-placeholder metric-placeholder-wide">
+            <div className="chart-grid chart-grid-insights">
+              <div className="metric-placeholder">
+                <p>Resolution Funnel</p>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={resolutionFunnelData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="stage" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#2563eb" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="metric-placeholder">
+                <p>Backlog Health</p>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={backlogHealthData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="bucket" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#f59e0b" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="metric-placeholder">
+                <p>Resolution Time Distribution</p>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={resolutionDistributionData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="bucket" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#22c55e" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="metric-placeholder">
+                <p>Maintainer Response Distribution</p>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={responseDistributionData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="bucket" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#0ea5e9" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="metric-placeholder">
+                <p>Closure Method</p>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={closerBreakdownData} layout="vertical" margin={{ left: 28 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" width={92} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#6366f1" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="metric-placeholder">
+                <p>Close Reasons</p>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={closeReasonData} layout="vertical" margin={{ left: 28 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" width={92} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#ef4444" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </div>
+          </>
+          )}
 
           <div className="metric-placeholder metric-placeholder-wide">
             <p>Issue Details</p>

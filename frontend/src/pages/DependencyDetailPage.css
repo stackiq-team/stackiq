@@ -1283,10 +1283,53 @@
 	text-decoration: underline;
 }
 
+.issue-chart-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin: 0 0 16px;
+	padding: 4px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: #eef3f8;
+}
+
+.issue-chart-toggle-button {
+	border: 0;
+	border-radius: 6px;
+	padding: 8px 12px;
+	background: transparent;
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 800;
+	cursor: pointer;
+	transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.issue-chart-toggle-button:hover {
+	color: #0f172a;
+	background: rgba(255, 255, 255, 0.65);
+}
+
+.issue-chart-toggle-button.is-active {
+	background: #fff;
+	color: #0f172a;
+	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.issue-chart-toggle-button:focus-visible {
+	outline: 2px solid var(--brand);
+	outline-offset: 2px;
+}
+
 .chart-grid {
 	display: grid;
 	grid-template-columns: repeat(3, 1fr);
 	gap: 16px;
+}
+
+.chart-grid-insights {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .chart-grid .metric-placeholder {
@@ -1396,6 +1439,15 @@
 		padding-inline: 8px;
 	}
 
+	.issue-chart-toggle {
+		display: flex;
+		width: 100%;
+	}
+
+	.issue-chart-toggle-button {
+		flex: 1;
+	}
+
 	.relationship-summary-grid {
 		grid-template-columns: 1fr 1fr;
 	}
@@ -1473,6 +1525,11 @@
 	}
 
 	.risk-modal-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.chart-grid,
+	.chart-grid-insights {
 		grid-template-columns: 1fr;
 	}
 }

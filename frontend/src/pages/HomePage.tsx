@@ -157,32 +157,18 @@ export default function JsonDropZone() {
             and detect relationship risks between packages.
           </p>
         </div>
-        <div className="hero-metrics" aria-label="Analysis coverage">
-          <div>
-            <strong>GitHub</strong>
-            <span>repo signals</span>
-          </div>
-          <div>
-            <strong>NPM</strong>
-            <span>package metadata</span>
-          </div>
-          <div>
-            <strong>Issues</strong>
-            <span>risk evidence</span>
-          </div>
-        </div>
       </div>
 
       <div className="scanner-grid">
         <div className="scanner-panel">
-          <div className="panel-header">
-            <div>
-              <h2>Package source</h2>
+          {fileName && (
+            <div className="panel-header">
+              <span className="file-pill">{fileName}</span>
             </div>
-            {fileName && <span className="file-pill">{fileName}</span>}
-          </div>
+          )}
 
-          <div className="emailSection">
+          <div className="form-section emailSection">
+            <div className="section-kicker">Optional notification</div>
             <label className="emailLabel">Email Address (optional)</label>
             <p className="emailHelp">
               Analysis can take a few minutes. Leave an email to get notified when the result is ready.
@@ -197,41 +183,47 @@ export default function JsonDropZone() {
             {emailError && <div className="error">{emailError}</div>}
           </div>
 
-          <div
-            className={`dropZone ${dragActive ? "dropZoneActive" : ""}`}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-          >
-            <input
-              type="file"
-              accept=".json,application/json"
-              onChange={handleInputChange}
-              className="input"
-              id="json-upload"
-            />
-            <label className="label" htmlFor="json-upload">
-              <span className="upload-icon">JSON</span>
-              <span>Drop package.json here or browse</span>
-            </label>
-          </div>
-
-          {fileName && (
-            <div className="success">
-              Loaded {fileName}
+          <div className="form-section">
+            <div className="section-kicker">Package JSON</div>
+            <div
+              className={`dropZone ${dragActive ? "dropZoneActive" : ""}`}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+            >
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={handleInputChange}
+                className="input"
+                id="json-upload"
+              />
+              <label className="label" htmlFor="json-upload">
+                <span className="upload-icon">JSON</span>
+                <span>Drop package.json here or browse</span>
+              </label>
             </div>
-          )}
+
+            {fileName && (
+              <div className="success">
+                Loaded {fileName}
+              </div>
+            )}
             {error && <div className="error">{error}</div>}
 
-          <textarea
-            className="jsonTextArea"
-            value={jsonText}
-            onChange={handleJsonTextChange}
-            placeholder={`{\n  "dependencies": {\n    "express": "^5.2.1"\n  }\n}`}
-            spellCheck={false}
-          />
+            <textarea
+              className="jsonTextArea"
+              value={jsonText}
+              onChange={handleJsonTextChange}
+              placeholder={`{\n  "dependencies": {\n    "express": "^5.2.1"\n  }\n}`}
+              spellCheck={false}
+            />
+          </div>
 
           <div className="scanner-actions">
+            <p className="submit-help">
+              Runs package, repository, issue, and relationship checks.
+            </p>
             <button
               className="submitButton"
               onClick={handleSubmit}
@@ -254,27 +246,27 @@ export default function JsonDropZone() {
         </div>
 
         <aside className="home-output-panel">
-          <h2>What StackIQ checks</h2>
+          <h2>Analysis flow</h2>
           <div className="home-output-list">
             <div className="home-output-item">
-              <span className="home-output-dot signal-blue"></span>
+              <span className="home-output-step signal-blue">1</span>
               <div>
-                <strong>Dependency scores</strong>
-                <p>Popularity, maintenance, release age, repository health, and issue resolution signals.</p>
+                <strong>Resolve packages</strong>
+                <p>Map each package to its package registry metadata and source repository.</p>
               </div>
             </div>
             <div className="home-output-item">
-              <span className="home-output-dot signal-orange"></span>
+              <span className="home-output-step signal-orange">2</span>
               <div>
-                <strong>Relationship risks</strong>
-                <p>Targeted issue searches for package pairs and evidence of conflicts or integration friction.</p>
+                <strong>Score dependency health</strong>
+                <p>Combine release freshness, usage, repository activity, and issue-resolution behavior.</p>
               </div>
             </div>
             <div className="home-output-item">
-              <span className="home-output-dot signal-green"></span>
+              <span className="home-output-step signal-green">3</span>
               <div>
-                <strong>Detailed breakdowns</strong>
-                <p>Open each dependency to inspect repository, package, score, relationship, and issue signals.</p>
+                <strong>Check package relationships</strong>
+                <p>Look for issue evidence that packages conflict, integrate poorly, or are commonly used together.</p>
               </div>
             </div>
           </div>
