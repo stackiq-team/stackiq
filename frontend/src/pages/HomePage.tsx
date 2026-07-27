@@ -224,24 +224,26 @@ export default function JsonDropZone() {
             <p className="submit-help">
               Runs package, repository, issue, and relationship checks.
             </p>
-            <button
-              className="submitButton"
-              onClick={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? "Analyzing..." : "Analyze Stack"}
-            </button>
-
-            {resultUrl && (
-              <a
-                className="resultButton"
-                href={resultUrl}
-                target="_blank"
-                rel="noreferrer"
+            <div className="scanner-action-buttons">
+              <button
+                className="submitButton"
+                onClick={handleSubmit}
+                disabled={loading}
               >
-                Open Result
-              </a>
-            )}
+                {loading ? "Analyzing..." : "Analyze Stack"}
+              </button>
+
+              {resultUrl && (
+                <a
+                  className="resultButton"
+                  href={resultUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open Result
+                </a>
+              )}
+            </div>
           </div>
         </div>
 

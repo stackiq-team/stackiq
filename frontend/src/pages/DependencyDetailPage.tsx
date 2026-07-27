@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { fetchAnalysisByResultToken } from "../service/ApiService";
 import type { AnalysisLookupResponse } from "../service/ApiService";
+import { exportDependencyReport } from "../reporting/dependencyReport";
 import "./DependencyDetailPage.css";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 
@@ -478,6 +479,7 @@ export default function DependencyDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dependency, setDependency] = useState<DependencyDetail | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisLookupResponse["analysis"] | null>(null);
   const [riskInfoOpen, setRiskInfoOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
   const [selectedCloserCategory, setSelectedCloserCategory] = useState<string | null>(null);
@@ -486,6 +488,7 @@ export default function DependencyDetailPage() {
   const [selectedPostCloseActivity, setSelectedPostCloseActivity] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("signals");
   const [issueChartView, setIssueChartView] = useState<IssueChartView>("activity");
+  const [isCompactCharts, setIsCompactCharts] = useState(false);
 
   const load = async () => {
     if (!resultToken || !dependencyName) {
@@ -507,6 +510,7 @@ export default function DependencyDetailPage() {
       }
 
       const decodedName = decodeURIComponent(dependencyName);
+      setAnalysis(response.data.analysis);
       const analysisResult = response.data.analysis.result;
       const depScore = analysisResult.dependencyScores.find(
         (ds) => ds.dependency.name === decodedName
@@ -540,6 +544,14 @@ export default function DependencyDetailPage() {
   useEffect(() => {
     void load();
   }, [resultToken, dependencyName]);
+
+  useEffect(() => {
+    const updateChartMode = () => setIsCompactCharts(window.innerWidth <= 560);
+
+    updateChartMode();
+    window.addEventListener("resize", updateChartMode);
+    return () => window.removeEventListener("resize", updateChartMode);
+  }, []);
 
   useEffect(() => {
     if (!riskInfoOpen) return;
@@ -723,6 +735,10 @@ export default function DependencyDetailPage() {
   ];
   const relationshipSignalCount =
     relationshipCounts.known + relationshipCounts.possible + relationshipCounts.mentions;
+  const pieOuterRadius = isCompactCharts ? 54 : 80;
+  const showPieLabels = !isCompactCharts;
+  const verticalAxisWidth = isCompactCharts ? 72 : 92;
+  const verticalChartMargin = isCompactCharts ? { left: 8, right: 8 } : { left: 28 };
 
   return (
     <section className="dependency-detail-page">
@@ -733,6 +749,14 @@ export default function DependencyDetailPage() {
             {dependency.type === "DEPENDENCY" ? "Dependency" : "Dev Dependency"}
           </span>
         </div>
+        {analysis && (
+          <button
+            className="button"
+            onClick={() => exportDependencyReport(analysis, dependency.name)}
+          >
+            Export PDF
+          </button>
+        )}
         <button 
           className="button button-back"
           onClick={() => navigate(`/results/${resultToken}`)}
@@ -1295,8 +1319,8 @@ export default function DependencyDetailPage() {
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={80}
-                        label
+                        outerRadius={pieOuterRadius}
+                        label={showPieLabels}
                         onClick={(data) => setSelectedCloserCategory(data.name as string)}
                       >
                         {closerBreakdownData.map((entry, index) => (
@@ -1314,7 +1338,7 @@ export default function DependencyDetailPage() {
                 <p>Timeline Activity Level</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={activityBucketData}>
+                    <BarChart data={activityBucketData} margin={isCompactCharts ? { left: -20, right: 8 } : undefined}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="bucket" />
                       <YAxis allowDecimals={false} />
@@ -1341,8 +1365,8 @@ export default function DependencyDetailPage() {
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={80}
-                        label
+                        outerRadius={pieOuterRadius}
+                        label={showPieLabels}
                         onClick={(data: any) => setSelectedCloseReason(data.name as string)}
                         cursor="pointer"
                       >
@@ -1368,8 +1392,8 @@ export default function DependencyDetailPage() {
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={80}
-                        label
+                        outerRadius={pieOuterRadius}
+                        label={showPieLabels}
                         onClick={(data: any) => setSelectedPostCloseActivity(data.name as string)}
                         cursor="pointer"
                       >
@@ -1423,7 +1447,7 @@ export default function DependencyDetailPage() {
 
           <div className="metric-placeholder metric-placeholder-wide">
             <p>Issues Opened vs Closed (by week)</p>
-            <div style={{ width: "100%", height: 300 }}>
+            <div className="wide-chart-container">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={issueChartData}
                   onClick={(state) => {
@@ -1513,10 +1537,10 @@ export default function DependencyDetailPage() {
                 <p>Closure Method</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={closerBreakdownData} layout="vertical" margin={{ left: 28 }}>
+                    <BarChart data={closerBreakdownData} layout="vertical" margin={verticalChartMargin}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" width={92} />
+                      <YAxis type="category" dataKey="name" width={verticalAxisWidth} />
                       <Tooltip />
                       <Bar dataKey="value" fill="#6366f1" />
                     </BarChart>
@@ -1528,10 +1552,10 @@ export default function DependencyDetailPage() {
                 <p>Close Reasons</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={closeReasonData} layout="vertical" margin={{ left: 28 }}>
+                    <BarChart data={closeReasonData} layout="vertical" margin={verticalChartMargin}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" width={92} />
+                      <YAxis type="category" dataKey="name" width={verticalAxisWidth} />
                       <Tooltip />
                       <Bar dataKey="value" fill="#ef4444" />
                     </BarChart>
