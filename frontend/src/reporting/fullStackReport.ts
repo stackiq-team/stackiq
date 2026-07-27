@@ -6,6 +6,7 @@ import {
   addTable,
   createReport,
   formatDate,
+  formatValue,
   getNumber,
   getRecord,
   getString,
@@ -54,8 +55,52 @@ function average(values: Array<number | null | undefined>) {
   return Math.round(numbers.reduce((sum, value) => sum + value, 0) / numbers.length);
 }
 
+function score(value: number | null | undefined) {
+  return typeof value === "number" ? `${value}/100` : "-";
+}
+
+function percent(value: unknown) {
+  return typeof value === "number" ? `${Math.round(value * 100)}%` : "-";
+}
+
+function weightedContribution(value: number | null | undefined, weight: number) {
+  return typeof value === "number" ? Math.round(value * weight) : "-";
+}
+
 function getNpmMetric(score: ScoreEntry, key: string) {
   return getNumber(getRecord(getRecord(score.githubMetrics)?.npm), key);
+}
+
+function scoreInputRows(scoreEntry: ScoreEntry) {
+  const githubMetrics = getRecord(scoreEntry.githubMetrics);
+  const npmMetrics = getRecord(githubMetrics?.npm);
+  const issueMetrics = getRecord(scoreEntry.issueMetrics);
+  const normalizedInputs = getRecord(scoreEntry.normalizedInputs);
+
+  return [
+    ["Package health", "Weekly downloads", formatValue(npmMetrics?.weeklyDownloads), score(getNumber(normalizedInputs, "weeklyDownloads"))],
+    ["Package health", "Latest publish age", `${formatValue(npmMetrics?.latestPublishAgeDays)} days`, score(getNumber(normalizedInputs, "latestPublishAge"))],
+    ["Package health", "Package age", `${formatValue(npmMetrics?.packageAgeDays)} days`, score(getNumber(normalizedInputs, "packageAge"))],
+    ["Package health", "Version count", formatValue(npmMetrics?.versionCount), score(getNumber(normalizedInputs, "versionCount"))],
+    ["Package health", "Dependency count", formatValue(npmMetrics?.dependencyCount), score(getNumber(normalizedInputs, "dependencyCount"))],
+    ["Package health", "NPM license", formatValue(npmMetrics?.hasLicense), score(getNumber(normalizedInputs, "npmLicense"))],
+    ["Package health", "Repository metadata", formatValue(npmMetrics?.hasRepository), score(getNumber(normalizedInputs, "npmRepository"))],
+    ["Package health", "README", formatValue(npmMetrics?.hasReadme), score(getNumber(normalizedInputs, "npmReadme"))],
+    ["Repository health", "Stars", formatValue(githubMetrics?.stars), score(getNumber(normalizedInputs, "stars"))],
+    ["Repository health", "Forks", formatValue(githubMetrics?.forks), score(getNumber(normalizedInputs, "forks"))],
+    ["Repository health", "Watchers", formatValue(githubMetrics?.watchers), score(getNumber(normalizedInputs, "watchers"))],
+    ["Repository health", "Contributors", formatValue(githubMetrics?.contributors), score(getNumber(normalizedInputs, "contributors"))],
+    ["Repository health", "Project age", `${formatValue(githubMetrics?.projectAgeDays)} days`, score(getNumber(normalizedInputs, "projectAge"))],
+    ["Repository health", "Pull requests", formatValue(githubMetrics?.pullRequests), score(getNumber(normalizedInputs, "pullRequests"))],
+    ["Issue resolution", "Resolution time", `${formatValue(issueMetrics?.medianResolutionTimeDays)} days median`, score(getNumber(normalizedInputs, "resolutionTime"))],
+    ["Issue resolution", "Maintainer response time", `${formatValue(issueMetrics?.medianFirstResponseTimeDays)} days median`, score(getNumber(normalizedInputs, "firstResponseTime"))],
+    ["Issue resolution", "Closure rate", percent(issueMetrics?.closureRate), score(getNumber(normalizedInputs, "closureRate"))],
+    ["Issue resolution", "Healthy closure rate", percent(issueMetrics?.healthyClosureRate), score(getNumber(normalizedInputs, "healthyClosureRate"))],
+    ["Issue resolution", "Stale open issue rate", percent(issueMetrics?.staleOpenIssueRate), score(getNumber(normalizedInputs, "staleOpenIssueRate"))],
+    ["Issue resolution", "Sample coverage", formatValue(issueMetrics?.totalIssuesAnalyzed), score(getNumber(normalizedInputs, "sampleCoverage"))],
+    ["Issue resolution", "Code-linked closure rate", percent(issueMetrics?.codeResolutionRate), score(getNumber(normalizedInputs, "codeResolutionRate"))],
+    ["Issue resolution", "Closed by PR rate", percent(issueMetrics?.closedByPrRate ?? issueMetrics?.closedByPRRate), score(getNumber(normalizedInputs, "closedByPrRate"))],
+  ];
 }
 
 function topLowestScores(scores: ScoreEntry[]) {
@@ -178,6 +223,62 @@ export function exportFullStackReport(analysis: Analysis) {
     ["Issue resolution", average(scores.map((score) => score.resolutionQualityScore))],
     ["Weekly downloads avg", average(scores.map((score) => getNpmMetric(score, "weeklyDownloads")))],
   ], y, 4);
+
+  y = addSectionTitle(doc, "Dependency Score Breakdown", y);
+  y = addParagraph(
+    doc,
+    "Each dependency score is built from package health, repository health, and issue resolution. Contributions show how many points each category adds to the final score using the 50 / 30 / 20 score model.",
+    y
+  );
+  y = addTable(
+    doc,
+    ["Package", "Final", "Package health", "Repo health", "Issue resolution", "Contribution"],
+    scores.map((scoreEntry) => [
+      scoreEntry.dependency.name,
+      score(scoreEntry.score),
+      score(scoreEntry.popularityScore),
+      score(scoreEntry.maintenanceScore),
+      score(scoreEntry.resolutionQualityScore),
+      `${formatValue(weightedContribution(scoreEntry.popularityScore, 0.5))} + ${formatValue(weightedContribution(scoreEntry.maintenanceScore, 0.3))} + ${formatValue(weightedContribution(scoreEntry.resolutionQualityScore, 0.2))}`,
+    ]),
+    y,
+    { fontSize: 7 }
+  );
+
+  y = addSectionTitle(doc, "Per-Package Score Details", y);
+  y = addParagraph(
+    doc,
+    "This section expands each package with the same score inputs shown in the dependency detail page.",
+    y
+  );
+
+  scores.forEach((scoreEntry) => {
+    y = addSectionTitle(doc, scoreEntry.dependency.name, y);
+    y = addKeyValueGrid(doc, [
+      ["Overall dependency score", score(scoreEntry.score)],
+      ["Risk level", scoreEntry.riskLevel],
+      ["Required version", scoreEntry.dependency.versionRequirement],
+      ["Type", scoreEntry.dependency.type],
+    ], y, 4);
+    y = addTable(
+      doc,
+      ["Category", "Score", "Weight", "Contribution"],
+      [
+        ["Package health", score(scoreEntry.popularityScore), "50%", formatValue(weightedContribution(scoreEntry.popularityScore, 0.5))],
+        ["Repository health", score(scoreEntry.maintenanceScore), "30%", formatValue(weightedContribution(scoreEntry.maintenanceScore, 0.3))],
+        ["Issue resolution", score(scoreEntry.resolutionQualityScore), "20%", formatValue(weightedContribution(scoreEntry.resolutionQualityScore, 0.2))],
+      ],
+      y,
+      { fontSize: 7 }
+    );
+    y = addTable(
+      doc,
+      ["Category", "Input", "Raw value", "Normalized score"],
+      scoreInputRows(scoreEntry),
+      y,
+      { fontSize: 6 }
+    );
+  });
 
   const missingRows = missingDataRows(analysis, scoresByDependencyId);
   if (missingRows.length > 0) {

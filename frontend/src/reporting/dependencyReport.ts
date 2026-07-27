@@ -40,6 +40,55 @@ function score(value: number | null | undefined) {
   return typeof value === "number" ? `${value}/100` : "-";
 }
 
+function weightedContribution(value: number | null | undefined, weight: number) {
+  return typeof value === "number" ? `${Math.round(value * weight)} points` : "-";
+}
+
+function scoreInputRows(
+  category: "package" | "repository" | "issues",
+  githubMetrics: Record<string, unknown> | null,
+  npmMetrics: Record<string, unknown> | null,
+  issueMetrics: Record<string, unknown> | null,
+  normalizedInputs: Record<string, unknown> | null
+) {
+  if (category === "package") {
+    return [
+      ["Weekly downloads", formatValue(npmMetrics?.weeklyDownloads), score(getNumber(normalizedInputs, "weeklyDownloads"))],
+      ["Latest publish age", `${formatValue(npmMetrics?.latestPublishAgeDays)} days`, score(getNumber(normalizedInputs, "latestPublishAge"))],
+      ["Package age", `${formatValue(npmMetrics?.packageAgeDays)} days`, score(getNumber(normalizedInputs, "packageAge"))],
+      ["Version count", formatValue(npmMetrics?.versionCount), score(getNumber(normalizedInputs, "versionCount"))],
+      ["Dependency count", formatValue(npmMetrics?.dependencyCount), score(getNumber(normalizedInputs, "dependencyCount"))],
+      ["NPM license", formatValue(npmMetrics?.hasLicense), score(getNumber(normalizedInputs, "npmLicense"))],
+      ["Repository metadata", formatValue(npmMetrics?.hasRepository), score(getNumber(normalizedInputs, "npmRepository"))],
+      ["README", formatValue(npmMetrics?.hasReadme), score(getNumber(normalizedInputs, "npmReadme"))],
+    ];
+  }
+
+  if (category === "repository") {
+    return [
+      ["Stars", formatValue(githubMetrics?.stars), score(getNumber(normalizedInputs, "stars"))],
+      ["Forks", formatValue(githubMetrics?.forks), score(getNumber(normalizedInputs, "forks"))],
+      ["Watchers", formatValue(githubMetrics?.watchers), score(getNumber(normalizedInputs, "watchers"))],
+      ["Contributors", formatValue(githubMetrics?.contributors), score(getNumber(normalizedInputs, "contributors"))],
+      ["Project age", `${formatValue(githubMetrics?.projectAgeDays)} days`, score(getNumber(normalizedInputs, "projectAge"))],
+      ["Pull requests", formatValue(githubMetrics?.pullRequests), score(getNumber(normalizedInputs, "pullRequests"))],
+      ["GitHub license", formatValue(githubMetrics?.license), score(getNumber(normalizedInputs, "githubLicense"))],
+    ];
+  }
+
+  return [
+    ["Resolution time", `${formatValue(issueMetrics?.medianResolutionTimeDays)} days median`, score(getNumber(normalizedInputs, "resolutionTime"))],
+    ["Maintainer response time", `${formatValue(issueMetrics?.medianFirstResponseTimeDays)} days median`, score(getNumber(normalizedInputs, "firstResponseTime"))],
+    ["Closure rate", percent(issueMetrics?.closureRate), score(getNumber(normalizedInputs, "closureRate"))],
+    ["Healthy closure rate", percent(issueMetrics?.healthyClosureRate), score(getNumber(normalizedInputs, "healthyClosureRate"))],
+    ["Stale open issue rate", percent(issueMetrics?.staleOpenIssueRate), score(getNumber(normalizedInputs, "staleOpenIssueRate"))],
+    ["Post-close activity", percent(issueMetrics?.postCloseActivityRate), score(getNumber(normalizedInputs, "postCloseActivityRate"))],
+    ["Sample coverage", formatValue(issueMetrics?.totalIssuesAnalyzed), score(getNumber(normalizedInputs, "sampleCoverage"))],
+    ["Code-linked closure rate", percent(issueMetrics?.codeResolutionRate), score(getNumber(normalizedInputs, "codeResolutionRate"))],
+    ["Closed by PR rate", percent(issueMetrics?.closedByPrRate ?? issueMetrics?.closedByPRRate), score(getNumber(normalizedInputs, "closedByPrRate"))],
+  ];
+}
+
 function issueRows(issueData: unknown) {
   if (!Array.isArray(issueData)) return [];
 
@@ -126,9 +175,9 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
     ["Match confidence", formatValue(githubMetrics?.repositoryMatchConfidence)],
   ], y);
 
-  y = addSectionTitle(doc, "Final Score", y);
+  y = addSectionTitle(doc, "Score Breakdown", y);
   y = addKeyValueGrid(doc, [
-    ["Dependency score", `${scoreEntry.score}/100`],
+    ["Overall dependency score", `${scoreEntry.score}/100`],
     ["Risk level", scoreEntry.riskLevel],
     ["Package health", score(scoreEntry.popularityScore)],
     ["Repository health", score(scoreEntry.maintenanceScore)],
@@ -136,20 +185,68 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
     ["Relationship signals", known + possible + mentions],
   ], y, 3);
 
-  y = addSectionTitle(doc, "Score Inputs", y);
-  y = addTable(doc, ["Category", "Raw signal", "Normalized"], [
-    ["Package", `Weekly downloads: ${formatValue(npmMetrics?.weeklyDownloads)}`, score(getNumber(normalizedInputs, "weeklyDownloads"))],
-    ["Package", `Latest publish age: ${formatValue(npmMetrics?.latestPublishAgeDays)} days`, score(getNumber(normalizedInputs, "latestPublishAge"))],
-    ["Package", `Package age: ${formatValue(npmMetrics?.packageAgeDays)} days`, score(getNumber(normalizedInputs, "packageAge"))],
-    ["Repository", `Stars: ${formatValue(githubMetrics?.stars)}`, score(getNumber(normalizedInputs, "stars"))],
-    ["Repository", `Forks: ${formatValue(githubMetrics?.forks)}`, score(getNumber(normalizedInputs, "forks"))],
-    ["Repository", `Contributors: ${formatValue(githubMetrics?.contributors)}`, score(getNumber(normalizedInputs, "contributors"))],
-    ["Issues", `Median resolution: ${formatValue(issueMetrics?.medianResolutionTimeDays)} days`, score(getNumber(normalizedInputs, "resolutionTime"))],
-    ["Issues", `Maintainer response: ${formatValue(issueMetrics?.medianFirstResponseTimeDays)} days`, score(getNumber(normalizedInputs, "firstResponseTime"))],
-    ["Issues", `Closure rate: ${percent(issueMetrics?.closureRate)}`, score(getNumber(normalizedInputs, "closureRate"))],
-    ["Issues", `Healthy closure rate: ${percent(issueMetrics?.healthyClosureRate)}`, score(getNumber(normalizedInputs, "healthyClosureRate"))],
-    ["Issues", `Stale open issue rate: ${percent(issueMetrics?.staleOpenIssueRate)}`, score(getNumber(normalizedInputs, "staleOpenIssueRate"))],
-  ], y);
+  y = addParagraph(
+    doc,
+    "The dependency score uses package health at 50%, repository health at 30%, and issue resolution at 20%. Relationship signals are reported separately and do not change the score.",
+    y
+  );
+
+  y = addTable(
+    doc,
+    ["Category", "Score", "Weight", "Contribution", "Signals used"],
+    [
+      [
+        "Package health",
+        score(scoreEntry.popularityScore),
+        "50%",
+        weightedContribution(scoreEntry.popularityScore, 0.5),
+        "downloads, release age, package age, versions, dependency count, license, repository, README",
+      ],
+      [
+        "Repository health",
+        score(scoreEntry.maintenanceScore),
+        "30%",
+        weightedContribution(scoreEntry.maintenanceScore, 0.3),
+        "stars, forks, watchers, contributors, project age, pull requests, repository license",
+      ],
+      [
+        "Issue resolution",
+        score(scoreEntry.resolutionQualityScore),
+        "20%",
+        weightedContribution(scoreEntry.resolutionQualityScore, 0.2),
+        "resolution time, maintainer response, closure rate, stale open issues, code-linked closures",
+      ],
+    ],
+    y,
+    { fontSize: 7 }
+  );
+
+  y = addSectionTitle(doc, "Package Health Inputs", y);
+  y = addTable(
+    doc,
+    ["Input", "Raw value", "Normalized score"],
+    scoreInputRows("package", githubMetrics, npmMetrics, issueMetrics, normalizedInputs),
+    y,
+    { fontSize: 7 }
+  );
+
+  y = addSectionTitle(doc, "Repository Health Inputs", y);
+  y = addTable(
+    doc,
+    ["Input", "Raw value", "Normalized score"],
+    scoreInputRows("repository", githubMetrics, npmMetrics, issueMetrics, normalizedInputs),
+    y,
+    { fontSize: 7 }
+  );
+
+  y = addSectionTitle(doc, "Issue Resolution Inputs", y);
+  y = addTable(
+    doc,
+    ["Input", "Raw value", "Normalized score"],
+    scoreInputRows("issues", githubMetrics, npmMetrics, issueMetrics, normalizedInputs),
+    y,
+    { fontSize: 7 }
+  );
 
   y = addSectionTitle(doc, "Repository Signals", y);
   y = addKeyValueGrid(doc, [
