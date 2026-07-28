@@ -28,6 +28,8 @@
     "graphql-request": "^7.4.0",
     "ioredis": "^5.11.0",
     "json2csv": "^5.0.7",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "nodemailer": "^9.0.1",
     "openai": "^4.6.0",
     "pg": "^8.21.0",

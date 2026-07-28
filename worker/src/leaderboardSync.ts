@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import * as https from "https";
 import { enqueueAnalysisJob } from "./queue/analysisQueue.js";
 
-const DEFAULT_EXPLORE_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
+const DEFAULT_EXPLORE_REFRESH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_EXPLORE_POPULAR_LIMIT = 3;
 const DEFAULT_GITHUB_SEARCH_LIMIT = 50;
 
@@ -21,6 +21,10 @@ function getConfiguredExploreRefreshIntervalMs() {
   );
   if (!Number.isFinite(value) || value <= 0) return DEFAULT_EXPLORE_REFRESH_INTERVAL_MS;
   return Math.floor(value);
+}
+
+function shouldRunExploreRefreshOnStart() {
+  return process.env.EXPLORE_RUN_ON_START === "true";
 }
 
 function ageInDays(dateValue: string | null | undefined): number | null {
@@ -339,7 +343,9 @@ async function analyzeRepository(prisma: PrismaClient, owner: string, name: stri
 
 export async function refreshLeaderboardRepositories(prisma: PrismaClient) {
   console.log("[worker] Starting explore refresh scheduler");
-  await runExploreRefresh(prisma);
+  if (shouldRunExploreRefreshOnStart()) {
+    await runExploreRefresh(prisma);
+  }
 
   const interval = getConfiguredExploreRefreshIntervalMs();
   const timer = setInterval(() => {

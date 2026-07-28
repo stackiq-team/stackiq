@@ -214,7 +214,13 @@ describe("processAnalysisJob", () => {
         summary: "Analysis completed.",
       }),
       "test@example.com",
-      ""
+      "",
+      expect.arrayContaining([
+        expect.objectContaining({
+          filename: expect.stringMatching(/stackiq-full-report-/),
+          contentType: "application/pdf",
+        }),
+      ])
     );
   });
 

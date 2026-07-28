@@ -124,6 +124,14 @@
 	color: var(--text);
 }
 
+.summary-card-note {
+	display: block;
+	margin-top: 8px;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--muted);
+}
+
 .summary-section {
 	margin-top: 16px;
 	border: 1px solid var(--border);

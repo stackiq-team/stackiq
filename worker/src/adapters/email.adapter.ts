@@ -3,6 +3,7 @@ import {
   type RiskLevel,
 } from "./../dependencyScore.js";
 import nodemailer from "nodemailer";
+import type Mail from "nodemailer/lib/mailer/index.js";
 
 type AnalysisResultData = {
   globalScore: number;
@@ -177,7 +178,8 @@ function buildEmailText(result: AnalysisResultData, resultUrl: string) {
 export async function sendResultEmail(
   result: AnalysisResultData,
   email: string,
-  analysisPageToken: string
+  analysisPageToken: string,
+  attachments: Mail.Attachment[] = []
 ): Promise<boolean> {
   const mailerUser = process.env.MAILER_USER;
   const mailerPass = process.env.GMAIL_APP_PASSWORD;
@@ -218,6 +220,7 @@ export async function sendResultEmail(
       subject: `StackIQ analysis result: ${result.riskLevel}`,
       html: buildEmailHtml(result, resultUrl),
       text: buildEmailText(result, resultUrl),
+      attachments,
     });
 
     return true;

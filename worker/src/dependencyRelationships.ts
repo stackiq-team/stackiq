@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { EnrichedDependencyInput } from "./dependencyScore.js";
 import { scoreDependency } from "./dependencyScore.js";
 import type { IssueSummary } from "./types/issuesMining.types.js";
@@ -96,7 +97,8 @@ const integrationTerms = [
 ];
 
 const riskyLabels = ["bug", "regression", "compatibility", "breaking-change"];
-const RELATIONSHIP_CACHE_VERSION = "relationship-v3-deep-issuemining";
+const RELATIONSHIP_CACHE_VERSION = "relationship-v4-issuemining-auto";
+const DEFAULT_RELATIONSHIP_DEEP_MIN_SCORE_SAMPLE_ISSUES = 30;
 
 export async function analyzeDependencyRelationships(args: {
   analysisId: string;
@@ -241,10 +243,15 @@ function buildIssueMiningRelationshipSearchResult(args: {
       body: issue.bodyPreview ?? "",
       labels: (issue.labels ?? []).map((name) => ({ name })),
     }))
-    .filter((issue) => issue.number != null);
+    .filter((issue) => {
+      if (issue.number == null) return false;
+      const labels = (issue.labels ?? []).map((label) => label.name ?? "").join(" ");
+      const text = `${issue.title}\n${issue.body ?? ""}\n${labels}`.toLowerCase();
+      return text.includes(args.targetDependencyName.toLowerCase());
+    });
 
   return {
-    total_count: args.source.issueData?.length ?? 0,
+    total_count: items.length,
     maxEvidenceIssues: args.maxEvidenceIssues,
     items,
   };
@@ -368,14 +375,47 @@ function buildRelationshipCacheKey(
   perPage: number,
   issueDataSampleKey: string
 ) {
+  const resolvedSampleKey = resolveRelationshipCacheSampleKey(source, issueDataSampleKey);
+
   return [
     RELATIONSHIP_CACHE_VERSION,
     source.gitHubMetrics.repository.fullName.toLowerCase(),
     source.dependency.name.toLowerCase(),
     target.dependency.name.toLowerCase(),
     String(perPage),
-    issueDataSampleKey,
+    resolvedSampleKey,
   ].join("|");
+}
+
+function resolveRelationshipCacheSampleKey(
+  source: RelationshipPair["source"],
+  issueDataSampleKey: string
+) {
+  if (
+    issueDataSampleKey.includes("auto") &&
+    (source.issueData?.length ?? 0) >= relationshipDeepMinScoreSampleIssues()
+  ) {
+    return `score-sample:${issueSampleFingerprint(source.issueData ?? [])}`;
+  }
+
+  return issueDataSampleKey;
+}
+
+function issueSampleFingerprint(issueData: IssueSummary[]) {
+  const numbers = issueData
+    .map((issue) => issue.number)
+    .filter((number): number is number => typeof number === "number")
+    .sort((a, b) => a - b)
+    .join(",");
+
+  return `${issueData.length}:${createHash("sha256").update(numbers).digest("hex").slice(0, 12)}`;
+}
+
+function relationshipDeepMinScoreSampleIssues() {
+  return positiveInteger(
+    process.env.DEPENDENCY_RELATIONSHIP_DEEP_MIN_SCORE_SAMPLE_ISSUES,
+    DEFAULT_RELATIONSHIP_DEEP_MIN_SCORE_SAMPLE_ISSUES
+  );
 }
 
 async function readCachedRelationship(args: {
