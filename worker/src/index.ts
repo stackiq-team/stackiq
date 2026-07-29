@@ -28,7 +28,7 @@ console.log(
   `[worker] Booting worker: queue=${ANALYSIS_QUEUE_NAME}, processJobs=${shouldProcessJobs}, schedulers=${shouldRunSchedulers}, concurrency=${workerConcurrency}, envWorkerConcurrency=${process.env.WORKER_CONCURRENCY ?? "unset"}`
 );
 console.log(
-  `[worker] Feature config: relationships=${process.env.DEPENDENCY_RELATIONSHIPS_ENABLED ?? "true"}, relationshipPairMode=all, relationshipSearchResults=${process.env.DEPENDENCY_RELATIONSHIP_SEARCH_RESULTS ?? "3"}, relationshipCacheTtlDays=${process.env.DEPENDENCY_RELATIONSHIP_CACHE_TTL_DAYS ?? "14"}`
+  `[worker] Feature config: relationships=${process.env.DEPENDENCY_RELATIONSHIPS_ENABLED ?? "true"}, relationshipPairMode=all, relationshipEvidenceLimit=${process.env.DEPENDENCY_RELATIONSHIP_EVIDENCE_LIMIT ?? process.env.DEPENDENCY_RELATIONSHIP_SEARCH_RESULTS ?? "3"}, relationshipDeepIssues=${process.env.DEPENDENCY_RELATIONSHIP_DEEP_ISSUES_ENABLED ?? "auto"}, relationshipDeepMinScoreSample=${process.env.DEPENDENCY_RELATIONSHIP_DEEP_MIN_SCORE_SAMPLE_ISSUES ?? "30"}, relationshipCacheTtlDays=${process.env.DEPENDENCY_RELATIONSHIP_CACHE_TTL_DAYS ?? "14"}`
 );
 
 const worker = shouldProcessJobs

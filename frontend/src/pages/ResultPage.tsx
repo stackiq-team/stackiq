@@ -19,6 +19,7 @@ const statusLabels: Record<AnalysisStatus, string> = {
 };
 
 const POLLING_INTERVAL_MS = 3000;
+const RELATIONSHIP_REFRESH_WINDOW_MS = 15 * 60 * 1000;
 
 function riskClassName(risk: RiskLevel): string {
   if (risk === "LOW") return "risk-low";
@@ -109,6 +110,42 @@ function getGithubMetrics(score?: ScoreEntry) {
     closedIssues:
       typeof issueMetrics?.closedIssues === "number" ? issueMetrics.closedIssues : null,
   };
+}
+
+function hasRepositoryForRelationshipChecks(score: ScoreEntry) {
+  const metrics = getRecord(score.githubMetrics);
+  const repository = getRecord(metrics?.repository);
+
+  return Boolean(
+    typeof repository?.owner === "string" &&
+      repository.owner.trim() !== "" &&
+      typeof repository?.name === "string" &&
+      repository.name.trim() !== "" &&
+      typeof repository?.fullName === "string" &&
+      repository.fullName.trim() !== ""
+  );
+}
+
+function expectedRelationshipCheckCount(analysis: AnalysisLookupResponse["analysis"]) {
+  const relationshipCandidates =
+    analysis.result?.dependencyScores.filter(hasRepositoryForRelationshipChecks).length ?? 0;
+
+  return relationshipCandidates > 1
+    ? relationshipCandidates * (relationshipCandidates - 1)
+    : 0;
+}
+
+function shouldPollForRelationshipUpdates(analysis: AnalysisLookupResponse["analysis"]) {
+  if (analysis.status !== "COMPLETED" || !analysis.result) return false;
+
+  const expectedChecks = expectedRelationshipCheckCount(analysis);
+  if (expectedChecks === 0) return false;
+  if (analysis.dependencyRelationships.length >= expectedChecks) return false;
+
+  const scoreCompletedAt = new Date(getScoreCompletionTime(analysis)).getTime();
+  if (Number.isNaN(scoreCompletedAt)) return true;
+
+  return Date.now() - scoreCompletedAt < RELATIONSHIP_REFRESH_WINDOW_MS;
 }
 
 function countRelationshipRisks(relationships: RelationshipEntry[]) {
@@ -374,7 +411,11 @@ export default function ResultPage() {
   }, [load]);
 
   useEffect(() => {
-    if (!analysis || analysis.status === "COMPLETED" || analysis.status === "FAILED") {
+    if (
+      !analysis ||
+      analysis.status === "FAILED" ||
+      (analysis.status === "COMPLETED" && !shouldPollForRelationshipUpdates(analysis))
+    ) {
       return;
     }
 
@@ -429,6 +470,8 @@ export default function ResultPage() {
   const relationshipCounts = countRelationshipRisks(analysis.dependencyRelationships);
   const totalRelationshipSignals =
     relationshipCounts.known + relationshipCounts.possible + relationshipCounts.mentions;
+  const expectedRelationshipChecks = expectedRelationshipCheckCount(analysis);
+  const relationshipChecksStillUpdating = shouldPollForRelationshipUpdates(analysis);
 
   return (
     <section className="result-page">
@@ -470,6 +513,11 @@ export default function ResultPage() {
             <article className="summary-card">
               <h2>Relationship Signals</h2>
               <p>{totalRelationshipSignals}</p>
+              {relationshipChecksStillUpdating && (
+                <span className="summary-card-note">
+                  Updating {analysis.dependencyRelationships.length}/{expectedRelationshipChecks} checks
+                </span>
+              )}
             </article>
           </div>
 

@@ -14,11 +14,14 @@ const DEFAULT_OLDER_CLOSED_ISSUES = 30;
 const DEFAULT_OLD_OPEN_ISSUES = 20;
 const DEFAULT_MAX_TIMELINE_PAGES = 1;
 const DEFAULT_HISTORY_START_DATE = '2015-01-01';
+const DEFAULT_TOKEN_STATUS_TTL_MS = 60_000;
 
 let tokens = [];
 let tokenReset = [];
 let tokenRemaining = [];
 let tokenNum = 0;
+let tokenSignature = "";
+let lastTokenStatusCheckAt = 0;
 
 let endingProjectIndex = 300;
 let currentProjectIndex = 0;
@@ -29,18 +32,25 @@ let tracking = {};
 let graphqlWithAuth = graphql.defaults({ headers: {} });
 
 function loadTokens() {
-  tokens = (process.env.GITHUB_API_TOKEN ?? '')
+  const loadedTokens = (process.env.GITHUB_API_TOKEN ?? '')
     .split(',')
     .map(t => t.trim())
     .filter(Boolean);
 
-  if (tokens.length === 0) {
+  if (loadedTokens.length === 0) {
     throw new Error('GITHUB_API_TOKEN is required to run issuesMining');
   }
 
-  tokenReset = tokens.map(() => "0");
-  tokenRemaining = tokens.map(() => -1);
-  tokenNum = 0;
+  const loadedSignature = loadedTokens.join("|");
+  if (loadedSignature !== tokenSignature) {
+    tokens = loadedTokens;
+    tokenReset = tokens.map(() => "0");
+    tokenRemaining = tokens.map(() => -1);
+    tokenNum = 0;
+    tokenSignature = loadedSignature;
+    lastTokenStatusCheckAt = 0;
+  }
+
   graphqlWithAuth = graphql.defaults({
     headers: {
       authorization: `token ${tokens[0]}`
@@ -73,6 +83,27 @@ function bucketTrackingKey(repoFullName, bucket) {
 }
 
 async function checkAllTokens() {
+  const now = Date.now();
+  const statusTtlMs = positiveInteger(
+    process.env.ISSUES_MINING_TOKEN_STATUS_TTL_MS,
+    DEFAULT_TOKEN_STATUS_TTL_MS
+  );
+  const bestKnownRemaining = Math.max(...tokenRemaining);
+
+  if (
+    lastTokenStatusCheckAt > 0 &&
+    now - lastTokenStatusCheckAt < statusTtlMs &&
+    bestKnownRemaining > ROTATION_THRESHOLD
+  ) {
+    const best = tokenRemaining.indexOf(bestKnownRemaining);
+    tokenNum = best;
+    graphqlWithAuth = graphql.defaults({
+      headers: { authorization: `token ${tokens[best]}` }
+    });
+    console.log(`[tokens] Reusing cached token status: token=${best}, remaining=${bestKnownRemaining}, ttlMs=${statusTtlMs}`);
+    return;
+  }
+
   for (let i = 0; i < tokens.length; i++) {
     const { rateLimit } = await graphql(
       `query { rateLimit { limit remaining resetAt } }`,
@@ -83,6 +114,8 @@ async function checkAllTokens() {
     const resetIn = Math.ceil((new Date(rateLimit.resetAt) - new Date()) / 1000 / 60);
     console.log(`[tokens] Token ${i}: ${rateLimit.remaining}/${rateLimit.limit} remaining — resets in ${resetIn} min`);
   }
+
+  lastTokenStatusCheckAt = Date.now();
 
   // pick the token with the most remaining
   const best = tokenRemaining.indexOf(Math.max(...tokenRemaining));
@@ -117,7 +150,7 @@ function getLegacyMaxIssues(state) {
 }
 
 function getSampleBuckets() {
-  return [
+  const configuredBuckets = [
     {
       name: 'recentOpen',
       state: 'OPEN',
@@ -149,6 +182,47 @@ function getSampleBuckets() {
       limit: positiveInteger(process.env.ISSUES_MINING_OLD_OPEN_LIMIT, DEFAULT_OLD_OPEN_ISSUES),
     },
   ].filter((bucket) => bucket.limit > 0);
+
+  return capSampleBuckets(configuredBuckets);
+}
+
+function getTotalIssueLimit() {
+  return positiveInteger(
+    process.env.ISSUES_MINING_MAX_ISSUES,
+    configuredDefaultIssueLimit()
+  );
+}
+
+function configuredDefaultIssueLimit() {
+  return (
+    DEFAULT_RECENT_OPEN_ISSUES +
+    DEFAULT_RECENT_CLOSED_ISSUES +
+    DEFAULT_OLDER_CLOSED_ISSUES +
+    DEFAULT_OLD_OPEN_ISSUES
+  );
+}
+
+function capSampleBuckets(buckets) {
+  const maxIssues = getTotalIssueLimit();
+  const configuredTotal = buckets.reduce((sum, bucket) => sum + bucket.limit, 0);
+  if (configuredTotal <= maxIssues) return buckets;
+
+  let remaining = maxIssues;
+  return buckets
+    .map((bucket, index) => {
+      const bucketsLeft = buckets.length - index;
+      const proportionalLimit = Math.floor((bucket.limit / configuredTotal) * maxIssues);
+      const limit = index === buckets.length - 1
+        ? remaining
+        : Math.min(bucket.limit, Math.max(1, Math.min(remaining - (bucketsLeft - 1), proportionalLimit)));
+
+      remaining -= limit;
+      return {
+        ...bucket,
+        limit,
+      };
+    })
+    .filter((bucket) => bucket.limit > 0);
 }
 
 function getMaxTimelinePages() {

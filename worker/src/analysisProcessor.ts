@@ -27,6 +27,7 @@ import {
 import { refreshLeaderboardRepositories } from "./leaderboardSync.js";
 import { compactIssueSummariesForStorage } from "./utils/issueDataPersistence.js";
 import { sanitizeJsonValue } from "./utils/jsonSanitizer.js";
+import { buildFullStackReportPdf } from "./reporting/fullStackReport.js";
 
 type AnalysisResultData = {
   globalScore: number;
@@ -121,6 +122,7 @@ const DEFAULT_GITHUB_MINER_TIMEOUT_MS = 20000;
 const DEFAULT_ISSUES_MINING_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_ISSUES_MINING_LOOKBACK_DAYS = 60;
 const DEFAULT_RELATIONSHIP_ISSUES_MAX_ISSUES = 80;
+const DEFAULT_RELATIONSHIP_DEEP_MIN_SCORE_SAMPLE_ISSUES = 30;
 const DEFAULT_RELATIONSHIP_ISSUES_TIMEOUT_MS = 5 * 60 * 1000;
 let dependencyCacheLockClient: Redis | null | undefined;
 
@@ -312,15 +314,6 @@ export async function processAnalysisJob(
     });
     logger.log(`[worker] Analysis status updated: analysisId=${analysisId}, status=COMPLETED`);
 
-    await sendResultEmailSafely({
-      email,
-      result,
-      dependencies,
-      resultToken: analysis.resultToken ?? "",
-      analysisId,
-      logger,
-    });
-
     const dependencyRelationships = await analyzeRelationshipsSafely({
       prisma,
       analysisId,
@@ -334,6 +327,16 @@ export async function processAnalysisJob(
         `[worker] Dependency relationships saved after completion: analysisId=${analysisId}, relationships=${dependencyRelationships.length}`
       );
     }
+
+    await sendResultEmailSafely({
+      email,
+      result,
+      dependencies,
+      dependencyRelationships,
+      resultToken: analysis.resultToken ?? "",
+      analysisId,
+      logger,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown worker error";
 
@@ -379,12 +382,13 @@ async function sendResultEmailSafely(args: {
   email: string | null | undefined;
   result: AnalysisResultData;
   dependencies: EnrichedDependencyInput[];
+  dependencyRelationships: DependencyRelationshipResult[];
   resultToken: string;
   analysisId: string;
   logger: Pick<Console, "log" | "error">;
 }) {
   args.logger.log(
-    `[worker] Sending result email: analysisId=${args.analysisId}, globalScore=${args.result.globalScore}, email=${args.email ?? "none"}`
+    `[worker] Sending result email after relationship analysis: analysisId=${args.analysisId}, globalScore=${args.result.globalScore}, relationships=${args.dependencyRelationships.length}, email=${args.email ?? "none"}`
   );
 
   if (!args.email) {
@@ -408,8 +412,33 @@ async function sendResultEmailSafely(args: {
       ...args.result,
       ...(dependencyScores ? { dependencyScores } : {}),
     };
+    const attachments: Parameters<typeof sendResultEmail>[3] = [];
 
-    await sendResultEmail(emailResult, args.email, args.resultToken);
+    try {
+      const reportPdf = buildFullStackReportPdf({
+        analysisId: args.analysisId,
+        resultToken: args.resultToken,
+        globalScore: args.result.globalScore,
+        riskLevel: args.result.riskLevel,
+        summary: args.result.summary,
+        dependencies: args.dependencies,
+        dependencyScores: args.result.dependencyScores ?? [],
+        relationships: args.dependencyRelationships,
+      });
+
+      attachments.push({
+        filename: `stackiq-full-report-${args.resultToken || args.analysisId}.pdf`,
+        content: reportPdf,
+        contentType: "application/pdf",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown PDF error";
+      args.logger.error(
+        `[worker] Failed to build result PDF attachment; sending email without attachment: analysisId=${args.analysisId}, error=${message}`
+      );
+    }
+
+    await sendResultEmail(emailResult, args.email, args.resultToken, attachments);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown email error";
     args.logger.error(
@@ -703,7 +732,7 @@ async function getRelationshipIssueData(args: {
   analysisId: string;
   cache: Map<string, Promise<IssueSummary[] | null | undefined>>;
 }) {
-  if (process.env.DEPENDENCY_RELATIONSHIP_DEEP_ISSUES_ENABLED === "false") {
+  if (!shouldRunDeepRelationshipIssueMining(args.source.issueData)) {
     return args.source.issueData ?? null;
   }
 
@@ -736,8 +765,9 @@ async function runRelationshipIssuesMining(args: {
 }) {
   const maxIssues = getRelationshipIssuesMaxIssues();
   const sinceDate = getRelationshipIssuesSinceDate();
+  const issueLimits = getRelationshipIssueBucketLimits(maxIssues);
   args.logger.log(
-    `[worker] Relationship issueMining started: analysisId=${args.analysisId}, repo=${args.fullName}, maxIssues=${maxIssues}, sinceDate=${sinceDate}`
+    `[worker] Relationship issueMining started: analysisId=${args.analysisId}, repo=${args.fullName}, maxIssues=${maxIssues}, recentOpen=${issueLimits.recentOpen}, recentClosed=${issueLimits.recentClosed}, olderClosed=${issueLimits.olderClosed}, oldOpen=${issueLimits.oldOpen}, sinceDate=${sinceDate}`
   );
 
   try {
@@ -745,10 +775,12 @@ async function runRelationshipIssuesMining(args: {
       withTemporaryEnv(
         {
           ISSUES_MINING_MAX_ISSUES: String(maxIssues),
-          ISSUES_MINING_MAX_OPEN_ISSUES:
-            process.env.DEPENDENCY_RELATIONSHIP_MAX_OPEN_ISSUES,
-          ISSUES_MINING_MAX_CLOSED_ISSUES:
-            process.env.DEPENDENCY_RELATIONSHIP_MAX_CLOSED_ISSUES,
+          ISSUES_MINING_MAX_OPEN_ISSUES: String(issueLimits.recentOpen + issueLimits.oldOpen),
+          ISSUES_MINING_MAX_CLOSED_ISSUES: String(issueLimits.recentClosed + issueLimits.olderClosed),
+          ISSUES_MINING_RECENT_OPEN_LIMIT: String(issueLimits.recentOpen),
+          ISSUES_MINING_RECENT_CLOSED_LIMIT: String(issueLimits.recentClosed),
+          ISSUES_MINING_OLDER_CLOSED_LIMIT: String(issueLimits.olderClosed),
+          ISSUES_MINING_OLD_OPEN_LIMIT: String(issueLimits.oldOpen),
         },
         () => args.runIssuesMining(args.owner, args.repo, sinceDate)
       ),
@@ -1023,19 +1055,61 @@ function getRelationshipIssuesMaxIssues() {
 }
 
 function getRelationshipIssueSampleKey() {
-  if (process.env.DEPENDENCY_RELATIONSHIP_DEEP_ISSUES_ENABLED === "false") {
+  if (getRelationshipDeepIssueMode() === "false") {
     return "score-sample";
   }
 
   return [
-    "deep-issuemining",
+    `relationship-issuemining-${getRelationshipDeepIssueMode()}`,
     `max=${getRelationshipIssuesMaxIssues()}`,
+    `minScoreSample=${getRelationshipDeepMinScoreSampleIssues()}`,
     `lookback=${positiveInteger(
       process.env.DEPENDENCY_RELATIONSHIP_ISSUES_LOOKBACK_DAYS ??
         process.env.ISSUES_MINING_LOOKBACK_DAYS,
       DEFAULT_ISSUES_MINING_LOOKBACK_DAYS
     )}`,
   ].join(":");
+}
+
+function shouldRunDeepRelationshipIssueMining(issueData: IssueSummary[] | null | undefined) {
+  const mode = getRelationshipDeepIssueMode();
+  if (mode === "false") return false;
+  if (mode === "always") return true;
+
+  const scoreSampleSize = Array.isArray(issueData) ? issueData.length : 0;
+  return scoreSampleSize < getRelationshipDeepMinScoreSampleIssues();
+}
+
+function getRelationshipDeepIssueMode() {
+  const configured = (process.env.DEPENDENCY_RELATIONSHIP_DEEP_ISSUES_ENABLED ?? "auto")
+    .trim()
+    .toLowerCase();
+
+  if (configured === "false" || configured === "0" || configured === "off") return "false";
+  if (configured === "always") return "always";
+  return "auto";
+}
+
+function getRelationshipDeepMinScoreSampleIssues() {
+  return positiveInteger(
+    process.env.DEPENDENCY_RELATIONSHIP_DEEP_MIN_SCORE_SAMPLE_ISSUES,
+    DEFAULT_RELATIONSHIP_DEEP_MIN_SCORE_SAMPLE_ISSUES
+  );
+}
+
+function getRelationshipIssueBucketLimits(maxIssues: number) {
+  const total = Math.max(1, maxIssues);
+  const recentOpen = Math.max(1, Math.floor(total * 0.3));
+  const recentClosed = Math.max(1, Math.floor(total * 0.4));
+  const olderClosed = Math.max(0, Math.floor(total * 0.2));
+  const used = recentOpen + recentClosed + olderClosed;
+
+  return {
+    recentOpen,
+    recentClosed,
+    olderClosed,
+    oldOpen: Math.max(0, total - used),
+  };
 }
 
 function shouldMineIssuesForDependency(dependency: DependencyInput) {
