@@ -60,8 +60,44 @@ describe("email adapter", () => {
         subject: "StackIQ analysis result: MEDIUM",
         html: expect.stringContaining("StackIQ analysis complete"),
         text: expect.stringContaining("Global score: 70"),
+        attachments: [],
       })
     );
+  });
+
+  it("uses the configured public app url for result links", async () => {
+    process.env.APP_PUBLIC_URL = "https://example.com/app/";
+
+    const result = {
+      globalScore: 70,
+      riskLevel: "LOW" as RiskLevel,
+      summary: "Analysis completed successfully.",
+    };
+
+    await sendResultEmail(result, "recipient@example.com", "token-123");
+
+    expect(sendMailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining('href="https://example.com/app/results/token-123"'),
+        text: expect.stringContaining("Result page: https://example.com/app/results/token-123"),
+      })
+    );
+  });
+
+  it("returns false when sending the email fails", async () => {
+    createTransportMock.mockReturnValueOnce({
+      sendMail: vi.fn().mockRejectedValue(new Error("SMTP failure")),
+    });
+
+    const result = {
+      globalScore: 70,
+      riskLevel: "MEDIUM" as RiskLevel,
+      summary: "Analysis completed successfully.",
+    };
+
+    const sent = await sendResultEmail(result, "recipient@example.com", "token-123");
+
+    expect(sent).toBe(false);
   });
 
   it("returns false when mailer credentials are not configured", async () => {

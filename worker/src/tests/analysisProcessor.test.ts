@@ -1,5 +1,5 @@
 import { AnalysisStatus } from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../adapters/issuesMining.adapter.js", () => ({
   runIssuesMining: vi.fn(),
@@ -11,6 +11,13 @@ vi.mock("../adapters/email.adapter.js", () => ({
 
 import { processAnalysisJob } from "../analysisProcessor.js";
 import { sendResultEmail } from "../adapters/email.adapter.js";
+
+const envBackup = { ...process.env };
+
+afterEach(() => {
+  process.env = { ...envBackup };
+  vi.clearAllMocks();
+});
 
 function createPrismaMock(
   analysis: { id: string; dependencies: any[], email?: string } | null = {
@@ -461,5 +468,187 @@ describe("processAnalysisJob", () => {
       issueResult
     );
     expect(releaseLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips result email and relationship persistence when no email and no relationship delegate are provided", async () => {
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      dependencies: [createDependency()],
+    });
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 91,
+      riskLevel: "LOW",
+      summary: "Analysis completed.",
+    });
+    const runGitHubMiner = vi.fn().mockResolvedValue(gitHubMetrics);
+    const runIssuesMining = vi.fn().mockResolvedValue({
+      ...issueResult,
+      issueData: [],
+    });
+
+    await processAnalysisJob(
+      {
+        id: "job-1",
+        attemptsMade: 0,
+        data: {
+          analysisId: "analysis-1",
+        },
+      },
+      {
+        prisma,
+        runAnalysis,
+        runGitHubMiner,
+        runIssuesMining,
+        logger,
+      }
+    );
+
+    expect(runAnalysis).toHaveBeenCalledWith({
+      analysisId: "analysis-1",
+      dependencies: expect.any(Array),
+    });
+    expect(sendResultEmail).not.toHaveBeenCalled();
+    expect(prisma.analysis.update).toHaveBeenLastCalledWith({
+      where: { id: "analysis-1" },
+      data: {
+        status: AnalysisStatus.COMPLETED,
+        errorMessage: null,
+      },
+    });
+  });
+
+  it("persists dependency relationships and skips dev dependency issue mining when disabled", async () => {
+    process.env.ISSUES_MINING_INCLUDE_DEV_DEPENDENCIES = "false";
+    process.env.DEPENDENCY_RELATIONSHIPS_ENABLED = "true";
+    process.env.DEPENDENCY_RELATIONSHIP_DEEP_ISSUES_ENABLED = "false";
+
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      dependencies: [
+        {
+          id: "dependency-1",
+          name: "express",
+          versionRequirement: "^4.0.0",
+          type: "DEPENDENCY",
+        },
+        {
+          id: "dependency-2",
+          name: "cors",
+          versionRequirement: "^2.0.0",
+          type: "DEV_DEPENDENCY",
+        },
+      ],
+    });
+    prisma.dependencyRelationship = {
+      deleteMany: vi.fn().mockResolvedValue({}),
+      upsert: vi.fn().mockResolvedValue({}),
+    } as any;
+
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 82,
+      riskLevel: "LOW",
+      summary: "Analysis completed.",
+      dependencyScores: [
+        {
+          dependencyId: "dependency-1",
+          score: 82,
+          riskLevel: "LOW" as const,
+        },
+        {
+          dependencyId: "dependency-2",
+          score: 61,
+          riskLevel: "MEDIUM" as const,
+        },
+      ],
+    });
+
+    const runGitHubMiner = vi.fn().mockImplementation(async ({ fullPackageName }) => {
+      if (fullPackageName === "express") {
+        return {
+          ...gitHubMetrics,
+          dependencyId: "dependency-1",
+          packageName: "express",
+          repository: {
+            owner: "expressjs",
+            name: "express",
+            fullName: "expressjs/express",
+            description: "Express",
+            url: "https://github.com/expressjs/express",
+            createdAt: "2014-01-01T00:00:00.000Z",
+          },
+        };
+      }
+
+      return {
+        ...gitHubMetrics,
+        dependencyId: "dependency-2",
+        packageName: "cors",
+        repository: {
+          owner: "expressjs",
+          name: "cors",
+          fullName: "expressjs/cors",
+          description: "Cors",
+          url: "https://github.com/expressjs/cors",
+          createdAt: "2014-01-01T00:00:00.000Z",
+        },
+      };
+    });
+
+    const runIssuesMining = vi.fn().mockResolvedValue({
+      status: "SUCCESS" as const,
+      metrics: issueResult.metrics,
+      issueData: [
+        {
+          number: 9021,
+          title: "CORS middleware does not work with this setup",
+          url: "https://github.com/expressjs/express/issues/9021",
+          closed: false,
+          publishedAt: "2026-01-01T00:00:00Z",
+          closedAt: null,
+          assigneesCount: 0,
+          firstAssignedAt: null,
+          closer: {
+            stateReason: null,
+            type: null,
+            merged: null,
+            closedByBot: null,
+            closedByLogin: null,
+            wasReclassified: false,
+          },
+          hasConnectedEvent: false,
+          hasPostCloseActivity: false,
+          tooManyTimelineItems: false,
+          timelineTotalCount: 0,
+          timelineCapturedCount: 0,
+          bodyPreview: "The cors package conflicts with this middleware order.",
+          labels: ["bug"],
+        },
+      ],
+    });
+
+    await processAnalysisJob(
+      {
+        id: "job-1",
+        attemptsMade: 0,
+        data: {
+          analysisId: "analysis-1",
+        },
+      },
+      {
+        prisma,
+        runAnalysis,
+        runGitHubMiner,
+        runIssuesMining,
+        logger,
+      }
+    );
+
+    expect(runIssuesMining).toHaveBeenCalledTimes(1);
+    expect(runIssuesMining).toHaveBeenCalledWith("expressjs", "express", expect.any(String));
+    expect(prisma.dependencyRelationship?.deleteMany).toHaveBeenCalledWith({
+      where: { analysisId: "analysis-1" },
+    });
+    expect(prisma.dependencyRelationship?.upsert).toHaveBeenCalled();
+    expect(sendResultEmail).not.toHaveBeenCalled();
   });
 });
