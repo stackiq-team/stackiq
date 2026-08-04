@@ -13,7 +13,7 @@ export function Header() {
                 <span className="logo">StackIQ</span>
             </button>
             <nav className="nav-links">
-                <button className={location.pathname === '/' ? 'active' : ''} onClick={() => navigate('/')}>Analyze</button>
+                <button className={location.pathname === '/' ? 'active' : ''} onClick={() => navigate('/')}>Analysis</button>
                 <button className={location.pathname.startsWith('/explore') || location.pathname === '/leaderboard' ? 'active' : ''} onClick={() => navigate('/explore')}>Explore</button>
             </nav>
             </div>
