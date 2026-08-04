@@ -1,86 +1,116 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-describe("Leaderboard DB Service - Query Building", () => {
-  describe("Leaderboard Item Updates", () => {
-    it("should construct update payload with scores", () => {
-      const updateData = {
-        popularityScore: 85,
-        activityScore: 70,
-        compatibilityScore: 60,
-        scoreBreakdown: { popularity: 85, activity: 70, compatibility: 60 },
-        averageScore: 71,
-      };
+const { findManyMock } = vi.hoisted(() => ({
+  findManyMock: vi.fn(),
+}));
 
-      expect(updateData.popularityScore).toBe(85);
-      expect(updateData.activityScore).toBe(70);
-      expect(updateData.compatibilityScore).toBe(60);
-      expect(updateData.averageScore).toBe(71);
+vi.mock("../db/client", () => ({
+  prisma: {
+    leaderboardRepository: {
+      findMany: findManyMock,
+    },
+  },
+}));
+
+import { getLeaderboardsFromDb } from "./leaderboardDbService";
+
+function makeRow(overrides: Record<string, unknown> = {}) {
+  return {
+    owner: "facebook",
+    name: "react",
+    fullName: "facebook/react",
+    description: "React",
+    url: "https://github.com/facebook/react",
+    stars: 1,
+    forks: 2,
+    watchers: 3,
+    issues: 4,
+    pullRequests: 5,
+    license: "MIT",
+    primaryLanguage: "TypeScript",
+    topics: ["react"],
+    repositoryCreatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    pushedAt: new Date("2026-01-02T00:00:00.000Z"),
+    githubPopularityScore: 90,
+    githubActivityScore: 80,
+    githubCompatibilityScore: 70,
+    analysisScore: 88,
+    analysisStatus: "COMPLETED",
+    analysisResultToken: "token-1",
+    packageJsonPresent: true,
+    ...overrides,
+  };
+}
+
+describe("getLeaderboardsFromDb", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.EXPLORE_TOP_LIMIT;
+    delete process.env.LEADERBOARD_TOP_LIMIT;
+
+    findManyMock
+      .mockResolvedValueOnce([makeRow()])
+      .mockResolvedValueOnce([makeRow({ fullName: "vercel/next.js", name: "next.js" })])
+      .mockResolvedValueOnce([makeRow({ fullName: "vuejs/core", name: "core" })]);
+  });
+
+  it("queries all categories and maps db rows", async () => {
+    const result = await getLeaderboardsFromDb(7);
+
+    expect(findManyMock).toHaveBeenNthCalledWith(1, {
+      where: { category: "popular" },
+      orderBy: [{ rank: "asc" }],
+      take: 7,
+    });
+    expect(findManyMock).toHaveBeenNthCalledWith(2, {
+      where: { category: "active" },
+      orderBy: [{ rank: "asc" }],
+      take: 3,
+    });
+    expect(findManyMock).toHaveBeenNthCalledWith(3, {
+      where: { category: "bestRanked" },
+      orderBy: [{ rank: "asc" }],
+      take: 3,
     });
 
-    it("should include optional fields when present", () => {
-      const data = {
-        description: "A popular React library",
-        primaryLanguage: "TypeScript",
-        lastFetchedAt: new Date("2025-07-25"),
-      };
-
-      expect(data.description).toBeDefined();
-      expect(data.primaryLanguage).toBe("TypeScript");
-      expect(data.lastFetchedAt).toBeInstanceOf(Date);
-    });
-
-    it("should construct create payload with all required fields", () => {
-      const createData = {
-        repositoryName: "react",
-        ownerName: "facebook",
-        ownerType: "Organization" as const,
-        description: "A JavaScript library for building UIs",
-        url: "https://github.com/facebook/react",
-        averageScore: 90,
-      };
-
-      expect(createData.repositoryName).toBe("react");
-      expect(createData.ownerName).toBe("facebook");
-      expect(createData.url).toMatch(/github.com/);
+    expect(result.lastUpdatedAt).toEqual(expect.any(String));
+    expect(result.leaderboards.popular[0]).toMatchObject({
+      fullName: "facebook/react",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      pushedAt: "2026-01-02T00:00:00.000Z",
+      popularityScore: 90,
+      activityScore: 80,
+      compatibilityScore: 70,
+      analysisScore: 88,
+      analysisStatus: "COMPLETED",
+      analysisResultToken: "token-1",
+      packageJsonPresent: true,
     });
   });
 
-  describe("Score Calculation", () => {
-    it("should calculate average score from component scores", () => {
-      const scores = { popularity: 85, activity: 70, compatibility: 60 };
-      const average = (scores.popularity + scores.activity + scores.compatibility) / 3;
-      expect(average).toBeCloseTo(71.67, 1);
-    });
+  it("uses EXPLORE_TOP_LIMIT when no argument is provided", async () => {
+    process.env.EXPLORE_TOP_LIMIT = "5.9";
+    findManyMock.mockReset();
+    findManyMock.mockResolvedValue([]);
 
-    it("should normalize component scores to 0-100 range", () => {
-      const normalizeScore = (value: number): number => Math.min(100, Math.max(0, value));
+    await getLeaderboardsFromDb();
 
-      expect(normalizeScore(-10)).toBe(0);
-      expect(normalizeScore(50)).toBe(50);
-      expect(normalizeScore(150)).toBe(100);
-    });
+    expect(findManyMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ take: 5 })
+    );
   });
 
-  describe("Repository Data Selection", () => {
-    it("should select required fields from repository", () => {
-      const repo = {
-        nameWithOwner: "facebook/react",
-        description: "React library",
-        url: "https://github.com/facebook/react",
-        stars: 200000,
-        forks: 45000,
-        watchers: 5000,
-      };
+  it("falls back to default popular limit when config is invalid", async () => {
+    process.env.EXPLORE_TOP_LIMIT = "not-a-number";
+    findManyMock.mockReset();
+    findManyMock.mockResolvedValue([]);
 
-      const selected = {
-        name: repo.nameWithOwner,
-        description: repo.description,
-        url: repo.url,
-      };
+    await getLeaderboardsFromDb();
 
-      expect(selected).toHaveProperty("name");
-      expect(selected).toHaveProperty("description");
-      expect(selected).toHaveProperty("url");
-    });
+    expect(findManyMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ take: 3 })
+    );
   });
 });

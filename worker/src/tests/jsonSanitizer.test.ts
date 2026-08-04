@@ -86,4 +86,77 @@ describe("sanitizeJsonValue", () => {
     expect(value?.issueData?.[0]).not.toHaveProperty("bodyPreview");
     expect(value?.issueData?.[0]?.title).toBe("Issue title");
   });
+
+  it("returns null for unsupported primitive values", () => {
+    expect(sanitizeJsonValue(Symbol("bad"))).toBeNull();
+  });
+
+  it("returns null when compacting missing issue summaries", () => {
+    expect(compactIssuesMiningResultForStorage(null)).toBeNull();
+    expect(
+      compactIssuesMiningResultForStorage({
+        status: "FAILED",
+        metrics: {
+          totalIssuesAnalyzed: null,
+          openIssues: null,
+          closedIssues: null,
+          closedIssuesAnalyzed: null,
+          recentActivityCount: null,
+          averageResolutionTimeHours: null,
+          averageResolutionTimeDays: null,
+          medianResolutionTimeDays: null,
+          averageFirstResponseTimeDays: null,
+          medianFirstResponseTimeDays: null,
+          firstResponseTimeHours: null,
+          closureRate: null,
+          noResponseRate: null,
+          closeRateByPR: null,
+          closedByPrRate: null,
+          closedByPRRate: null,
+          codeResolutionRate: null,
+          postCloseActivityRate: null,
+          openToAssignedTimeHours: null,
+          mergedPRRate: null,
+          uncodedCloseRate: null,
+          healthyClosureRate: null,
+          staleOpenIssueRate: null,
+          sampleRecentOpenIssues: null,
+          sampleRecentClosedIssues: null,
+          sampleOlderClosedIssues: null,
+          sampleOldOpenIssues: null,
+        },
+      } as any)
+    ).toEqual({
+      status: "FAILED",
+      metrics: {
+        totalIssuesAnalyzed: null,
+        openIssues: null,
+        closedIssues: null,
+        closedIssuesAnalyzed: null,
+        recentActivityCount: null,
+        averageResolutionTimeHours: null,
+        averageResolutionTimeDays: null,
+        medianResolutionTimeDays: null,
+        averageFirstResponseTimeDays: null,
+        medianFirstResponseTimeDays: null,
+        firstResponseTimeHours: null,
+        closureRate: null,
+        noResponseRate: null,
+        closeRateByPR: null,
+        closedByPrRate: null,
+        closedByPRRate: null,
+        codeResolutionRate: null,
+        postCloseActivityRate: null,
+        openToAssignedTimeHours: null,
+        mergedPRRate: null,
+        uncodedCloseRate: null,
+        healthyClosureRate: null,
+        staleOpenIssueRate: null,
+        sampleRecentOpenIssues: null,
+        sampleRecentClosedIssues: null,
+        sampleOlderClosedIssues: null,
+        sampleOldOpenIssues: null,
+      },
+    });
+  });
 });

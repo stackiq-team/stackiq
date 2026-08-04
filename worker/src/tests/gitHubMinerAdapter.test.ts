@@ -112,4 +112,111 @@ describe("GitHubMiner adapter", () => {
       })
     ).rejects.toThrow("No GitHub miner results found for missing@1.0.0");
   });
+
+  it("returns an empty payload string when miner command fails", async () => {
+    runGitHubMinerCommandMock.mockRejectedValueOnce(new Error("miner failed"));
+
+    const response = await runGitHubMiner({
+      fullPackageName: "broken",
+      versionRequirement: "1.0.0",
+      dependencyId: "dep-1",
+    });
+
+    expect(response).toBe("");
+  });
+
+  it("throws when raw json is invalid", async () => {
+    await expect(
+      parseGitHubMinerData(
+        {
+          fullPackageName: "broken",
+          versionRequirement: "1.0.0",
+          dependencyId: "dep-1",
+        },
+        "{invalid-json"
+      )
+    ).rejects.toThrow();
+  });
+
+  it("returns high-confidence match before star-based fallback", async () => {
+    runGitHubMinerCommandMock.mockResolvedValue({
+      raw: [
+        {
+          ...rawRepository,
+          name: "stars-winner",
+          stars: 999,
+          repositoryMatchConfidence: "LOW",
+        },
+        {
+          ...rawRepository,
+          name: "confidence-winner",
+          stars: 10,
+          repositoryMatchConfidence: "HIGH",
+        },
+      ],
+    });
+
+    const response = await fetchGitHubMinerData({
+      fullPackageName: "testDependency",
+      versionRequirement: "2.0.0",
+      dependencyId: "testDependencyId",
+    });
+
+    expect(response.repository.name).toBe("confidence-winner");
+    expect(response.repositoryMatchConfidence).toBe("HIGH");
+  });
+
+  it("maps optional repository match source and npm metadata", async () => {
+    const response = await parseGitHubMinerData(
+      {
+        fullPackageName: "testDependency",
+        versionRequirement: "1.0.0",
+        dependencyId: "testDependencyId",
+      },
+      JSON.stringify([
+        {
+          ...rawRepository,
+          repositoryMatchSource: "NPM_HOMEPAGE",
+          npm: {
+            name: "testDependency",
+            homepage: "https://npmjs.com/package/testDependency",
+          },
+        },
+      ])
+    );
+
+    expect(response[0]?.repositoryMatchSource).toBe("NPM_HOMEPAGE");
+    expect(response[0]?.npm).toEqual({
+      name: "testDependency",
+      homepage: "https://npmjs.com/package/testDependency",
+    });
+  });
+
+  it("prefers exact full name match when confidence is not high", async () => {
+    runGitHubMinerCommandMock.mockResolvedValue({
+      raw: [
+        {
+          ...rawRepository,
+          owner: "some-org",
+          name: "some-repo",
+          stars: 999,
+        },
+        {
+          ...rawRepository,
+          owner: "",
+          name: "",
+          stars: 1,
+        },
+      ],
+    });
+
+    const response = await fetchGitHubMinerData({
+      fullPackageName: "/",
+      versionRequirement: "1.2.3",
+      dependencyId: "dep-exact",
+    });
+
+    expect(response.repository.fullName).toBe("/");
+    expect(response.stars).toBe(1);
+  });
 });

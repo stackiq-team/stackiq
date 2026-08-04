@@ -1,8 +1,16 @@
 import { AnalysisStatus } from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { fetchGitHubMinerDataMock } = vi.hoisted(() => ({
+  fetchGitHubMinerDataMock: vi.fn(),
+}));
 
 vi.mock("../adapters/issuesMining.adapter.js", () => ({
   runIssuesMining: vi.fn(),
+}));
+
+vi.mock("../adapters/githubMinerAdapter.js", () => ({
+  fetchGitHubMinerData: fetchGitHubMinerDataMock,
 }));
 
 vi.mock("../adapters/email.adapter.js", () => ({
@@ -11,6 +19,15 @@ vi.mock("../adapters/email.adapter.js", () => ({
 
 import { processAnalysisJob } from "../analysisProcessor.js";
 import { sendResultEmail } from "../adapters/email.adapter.js";
+import { runIssuesMining } from "../adapters/issuesMining.adapter.js";
+import * as FullStackReport from "../reporting/fullStackReport.js";
+
+const envBackup = { ...process.env };
+
+afterEach(() => {
+  process.env = { ...envBackup };
+  vi.clearAllMocks();
+});
 
 function createPrismaMock(
   analysis: { id: string; dependencies: any[], email?: string } | null = {
@@ -18,7 +35,7 @@ function createPrismaMock(
     email:"test@example.com",
     dependencies: [],
   }
-) {
+): any {
   return {
     analysis: {
       findUnique: vi.fn().mockResolvedValue(analysis),
@@ -461,5 +478,627 @@ describe("processAnalysisJob", () => {
       issueResult
     );
     expect(releaseLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips result email and relationship persistence when no email and no relationship delegate are provided", async () => {
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      dependencies: [createDependency()],
+    });
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 91,
+      riskLevel: "LOW",
+      summary: "Analysis completed.",
+    });
+    const runGitHubMiner = vi.fn().mockResolvedValue(gitHubMetrics);
+    const runIssuesMining = vi.fn().mockResolvedValue({
+      ...issueResult,
+      issueData: [],
+    });
+
+    await processAnalysisJob(
+      {
+        id: "job-1",
+        attemptsMade: 0,
+        data: {
+          analysisId: "analysis-1",
+        },
+      },
+      {
+        prisma,
+        runAnalysis,
+        runGitHubMiner,
+        runIssuesMining,
+        logger,
+      }
+    );
+
+    expect(runAnalysis).toHaveBeenCalledWith({
+      analysisId: "analysis-1",
+      dependencies: expect.any(Array),
+    });
+    expect(sendResultEmail).not.toHaveBeenCalled();
+    expect(prisma.analysis.update).toHaveBeenLastCalledWith({
+      where: { id: "analysis-1" },
+      data: {
+        status: AnalysisStatus.COMPLETED,
+        errorMessage: null,
+      },
+    });
+  });
+
+  it("persists dependency relationships and skips dev dependency issue mining when disabled", async () => {
+    process.env.ISSUES_MINING_INCLUDE_DEV_DEPENDENCIES = "false";
+    process.env.DEPENDENCY_RELATIONSHIPS_ENABLED = "true";
+    process.env.DEPENDENCY_RELATIONSHIP_DEEP_ISSUES_ENABLED = "false";
+
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      dependencies: [
+        {
+          id: "dependency-1",
+          name: "express",
+          versionRequirement: "^4.0.0",
+          type: "DEPENDENCY",
+        },
+        {
+          id: "dependency-2",
+          name: "cors",
+          versionRequirement: "^2.0.0",
+          type: "DEV_DEPENDENCY",
+        },
+      ],
+    });
+    prisma.dependencyRelationship = {
+      deleteMany: vi.fn().mockResolvedValue({}),
+      upsert: vi.fn().mockResolvedValue({}),
+    } as any;
+
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 82,
+      riskLevel: "LOW",
+      summary: "Analysis completed.",
+      dependencyScores: [
+        {
+          dependencyId: "dependency-1",
+          score: 82,
+          riskLevel: "LOW" as const,
+        },
+        {
+          dependencyId: "dependency-2",
+          score: 61,
+          riskLevel: "MEDIUM" as const,
+        },
+      ],
+    });
+
+    const runGitHubMiner = vi.fn().mockImplementation(async ({ fullPackageName }) => {
+      if (fullPackageName === "express") {
+        return {
+          ...gitHubMetrics,
+          dependencyId: "dependency-1",
+          packageName: "express",
+          repository: {
+            owner: "expressjs",
+            name: "express",
+            fullName: "expressjs/express",
+            description: "Express",
+            url: "https://github.com/expressjs/express",
+            createdAt: "2014-01-01T00:00:00.000Z",
+          },
+        };
+      }
+
+      return {
+        ...gitHubMetrics,
+        dependencyId: "dependency-2",
+        packageName: "cors",
+        repository: {
+          owner: "expressjs",
+          name: "cors",
+          fullName: "expressjs/cors",
+          description: "Cors",
+          url: "https://github.com/expressjs/cors",
+          createdAt: "2014-01-01T00:00:00.000Z",
+        },
+      };
+    });
+
+    const runIssuesMining = vi.fn().mockResolvedValue({
+      status: "SUCCESS" as const,
+      metrics: issueResult.metrics,
+      issueData: [
+        {
+          number: 9021,
+          title: "CORS middleware does not work with this setup",
+          url: "https://github.com/expressjs/express/issues/9021",
+          closed: false,
+          publishedAt: "2026-01-01T00:00:00Z",
+          closedAt: null,
+          assigneesCount: 0,
+          firstAssignedAt: null,
+          closer: {
+            stateReason: null,
+            type: null,
+            merged: null,
+            closedByBot: null,
+            closedByLogin: null,
+            wasReclassified: false,
+          },
+          hasConnectedEvent: false,
+          hasPostCloseActivity: false,
+          tooManyTimelineItems: false,
+          timelineTotalCount: 0,
+          timelineCapturedCount: 0,
+          bodyPreview: "The cors package conflicts with this middleware order.",
+          labels: ["bug"],
+        },
+      ],
+    });
+
+    await processAnalysisJob(
+      {
+        id: "job-1",
+        attemptsMade: 0,
+        data: {
+          analysisId: "analysis-1",
+        },
+      },
+      {
+        prisma,
+        runAnalysis,
+        runGitHubMiner,
+        runIssuesMining,
+        logger,
+      }
+    );
+
+    expect(runIssuesMining).toHaveBeenCalledTimes(1);
+    expect(runIssuesMining).toHaveBeenCalledWith("expressjs", "express", expect.any(String));
+    expect(prisma.dependencyRelationship?.deleteMany).toHaveBeenCalledWith({
+      where: { analysisId: "analysis-1" },
+    });
+    expect(prisma.dependencyRelationship?.upsert).toHaveBeenCalled();
+    expect(sendResultEmail).not.toHaveBeenCalled();
+  });
+
+  it("uses default analysis/miner/issues functions when overrides are omitted", async () => {
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      email: "test@example.com",
+      dependencies: [
+        {
+          id: "dependency-1",
+          name: "react",
+          versionRequirement: "^19.0.0",
+          type: "DEPENDENCY",
+        },
+      ],
+    });
+
+    fetchGitHubMinerDataMock.mockResolvedValueOnce({
+      ...gitHubMetrics,
+      dependencyId: "dependency-1",
+      packageName: "react",
+      repository: {
+        owner: "facebook",
+        name: "react",
+        fullName: "facebook/react",
+        description: "React",
+        url: "https://github.com/facebook/react",
+        createdAt: "2013-05-24T00:00:00.000Z",
+      },
+    });
+
+    vi.mocked(runIssuesMining).mockResolvedValueOnce({
+      status: "SUCCESS",
+      metrics: issueResult.metrics,
+      issueData: [],
+    } as any);
+
+    await processAnalysisJob(job, {
+      prisma,
+      logger,
+    });
+
+    expect(fetchGitHubMinerDataMock).toHaveBeenCalledWith({
+      fullPackageName: "react",
+      versionRequirement: "^19.0.0",
+      dependencyId: "dependency-1",
+    });
+    expect(runIssuesMining).toHaveBeenCalled();
+    expect(prisma.analysis.update).toHaveBeenLastCalledWith({
+      where: { id: "analysis-1" },
+      data: {
+        status: AnalysisStatus.COMPLETED,
+        errorMessage: null,
+      },
+    });
+  });
+
+  it("logs and continues when PDF generation and email sending fail", async () => {
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      email: "test@example.com",
+      dependencies: [createDependency()],
+    });
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 88,
+      riskLevel: "LOW",
+      summary: "Done",
+      dependencyScores: [
+        {
+          dependencyId: "dependency-1",
+          score: 88,
+          riskLevel: "LOW" as const,
+        },
+      ],
+    });
+    const runGitHubMiner = vi.fn().mockResolvedValue(gitHubMetrics);
+    const runIssuesMiningMock = vi.fn().mockResolvedValue({
+      ...issueResult,
+      issueData: [],
+    });
+
+    vi.spyOn(FullStackReport, "buildFullStackReportPdf").mockImplementationOnce(() => {
+      throw new Error("pdf failed");
+    });
+    vi.mocked(sendResultEmail).mockRejectedValueOnce(new Error("smtp failed"));
+
+    await processAnalysisJob(job, {
+      prisma,
+      runAnalysis,
+      runGitHubMiner,
+      runIssuesMining: runIssuesMiningMock,
+      logger,
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to build result PDF attachment")
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to send result email after completion")
+    );
+    expect(prisma.analysis.update).toHaveBeenLastCalledWith({
+      where: { id: "analysis-1" },
+      data: {
+        status: AnalysisStatus.COMPLETED,
+        errorMessage: null,
+      },
+    });
+  });
+
+  it("handles cache and deep relationship mining failures without aborting completion", async () => {
+    process.env.DEPENDENCY_RELATIONSHIPS_ENABLED = "true";
+    process.env.DEPENDENCY_RELATIONSHIP_DEEP_ISSUES_ENABLED = "always";
+    process.env.DEPENDENCY_RELATIONSHIP_ISSUES_MAX_ISSUES = "10";
+    process.env.DEPENDENCY_RELATIONSHIP_ISSUES_LOOKBACK_DAYS = "15";
+    process.env.DEPENDENCY_RELATIONSHIP_ISSUES_TIMEOUT_MS = "1000";
+
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      dependencies: [
+        {
+          id: "dependency-1",
+          name: "express",
+          versionRequirement: "^4.0.0",
+          type: "DEPENDENCY",
+        },
+        {
+          id: "dependency-2",
+          name: "cors",
+          versionRequirement: "^2.0.0",
+          type: "DEPENDENCY",
+        },
+      ],
+    });
+    prisma.dependencyRelationship = {
+      deleteMany: vi.fn().mockResolvedValue({}),
+      upsert: vi.fn().mockResolvedValue({}),
+    } as any;
+
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 78,
+      riskLevel: "MEDIUM",
+      summary: "Completed with warnings",
+      dependencyScores: [
+        {
+          dependencyId: "dependency-1",
+          score: 78,
+          riskLevel: "MEDIUM" as const,
+        },
+        {
+          dependencyId: "dependency-2",
+          score: 71,
+          riskLevel: "MEDIUM" as const,
+        },
+      ],
+    });
+
+    const runGitHubMiner = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ...gitHubMetrics,
+        dependencyId: "dependency-1",
+        packageName: "express",
+        repository: {
+          owner: "expressjs",
+          name: "express",
+          fullName: "expressjs/express",
+          description: "Express",
+          url: "https://github.com/expressjs/express",
+          createdAt: "2014-01-01T00:00:00.000Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        ...gitHubMetrics,
+        dependencyId: "dependency-2",
+        packageName: "cors",
+        repository: {
+          owner: "expressjs",
+          name: "cors",
+          fullName: "expressjs/cors",
+          description: "Cors",
+          url: "https://github.com/expressjs/cors",
+          createdAt: "2014-01-01T00:00:00.000Z",
+        },
+      });
+
+    const runIssuesMining = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: "FAILED" as const,
+        error: "sample incomplete",
+        metrics: {
+          ...issueResult.metrics,
+          totalIssuesAnalyzed: 0,
+        },
+      })
+      .mockResolvedValueOnce({
+        status: "SUCCESS" as const,
+        metrics: issueResult.metrics,
+        issueData: [
+          {
+            number: 4001,
+            title: "cors does not work with this middleware order",
+            url: "https://github.com/expressjs/express/issues/4001",
+            closed: false,
+            publishedAt: "2026-01-01T00:00:00Z",
+            closedAt: null,
+            assigneesCount: 0,
+            firstAssignedAt: null,
+            closer: {
+              stateReason: null,
+              type: null,
+              merged: null,
+              closedByBot: null,
+              closedByLogin: null,
+              wasReclassified: false,
+            },
+            hasConnectedEvent: false,
+            hasPostCloseActivity: false,
+            tooManyTimelineItems: false,
+            timelineTotalCount: 0,
+            timelineCapturedCount: 0,
+            bodyPreview: "Potential conflict with cors",
+            labels: ["bug"],
+          },
+        ],
+      });
+
+    const cacheManager = {
+      buildLookup: vi.fn().mockReturnValue({ cacheKey: "lookup" }),
+      buildCacheKey: vi.fn().mockReturnValue("cache-key"),
+      findCache: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("lookup failed"))
+        .mockResolvedValue(null),
+      acquireLock: vi
+        .fn()
+        .mockResolvedValue(async () => Promise.reject(new Error("unlock failed"))),
+      save: vi.fn().mockRejectedValue(new Error("save failed")),
+    };
+
+    await processAnalysisJob(job, {
+      prisma,
+      runAnalysis,
+      runGitHubMiner,
+      runIssuesMining,
+      cacheManager: cacheManager as any,
+      logger,
+    });
+
+    expect(runAnalysis).toHaveBeenCalled();
+    expect(cacheManager.findCache).toHaveBeenCalled();
+    expect(cacheManager.acquireLock).toHaveBeenCalled();
+    expect(cacheManager.save).toHaveBeenCalled();
+    expect(runIssuesMining).toHaveBeenCalled();
+    expect(prisma.dependencyRelationship?.deleteMany).toHaveBeenCalledWith({
+      where: { analysisId: "analysis-1" },
+    });
+    expect(prisma.dependencyRelationship?.upsert).toHaveBeenCalled();
+    expect(prisma.analysis.update).toHaveBeenLastCalledWith({
+      where: { id: "analysis-1" },
+      data: {
+        status: AnalysisStatus.COMPLETED,
+        errorMessage: null,
+      },
+    });
+  });
+
+  it("uses cached data acquired after lock and falls back when relationship persistence fails", async () => {
+    process.env.DEPENDENCY_RELATIONSHIPS_ENABLED = "true";
+
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      dependencies: [createDependency()],
+    });
+    prisma.dependencyRelationship = {
+      deleteMany: vi.fn().mockRejectedValue(new Error("relationship delete failed")),
+      upsert: vi.fn(),
+    } as any;
+
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 90,
+      riskLevel: "LOW",
+      summary: "Cached done",
+      dependencyScores: [
+        {
+          dependencyId: "dependency-1",
+          score: 90,
+          riskLevel: "LOW" as const,
+        },
+      ],
+    });
+    const runGitHubMiner = vi.fn();
+    const runIssuesMiningMock = vi.fn();
+    const releaseLock = vi.fn().mockResolvedValue(undefined);
+
+    const cacheManager = {
+      buildLookup: vi.fn().mockReturnValue({ cacheKey: "lookup" }),
+      buildCacheKey: vi.fn().mockReturnValue("cache-key"),
+      findCache: vi
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          cacheKey: "cache-key",
+          gitHubMetrics,
+          issueResult,
+          warnings: [],
+          score: {
+            dependencyId: "dependency-1",
+            score: 90,
+            riskLevel: "LOW",
+          },
+          expiresAt: new Date(Date.now() + 10_000),
+        }),
+      acquireLock: vi.fn().mockResolvedValue(releaseLock),
+      save: vi.fn(),
+    };
+
+    await processAnalysisJob(job, {
+      prisma,
+      runAnalysis,
+      runGitHubMiner,
+      runIssuesMining: runIssuesMiningMock,
+      cacheManager: cacheManager as any,
+      logger,
+    });
+
+    expect(cacheManager.acquireLock).toHaveBeenCalled();
+    expect(cacheManager.findCache).toHaveBeenCalledTimes(2);
+    expect(releaseLock).toHaveBeenCalled();
+    expect(runGitHubMiner).not.toHaveBeenCalled();
+    expect(runIssuesMiningMock).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("Dependency relationship analysis failed")
+    );
+    expect(prisma.analysis.update).toHaveBeenLastCalledWith({
+      where: { id: "analysis-1" },
+      data: {
+        status: AnalysisStatus.COMPLETED,
+        errorMessage: null,
+      },
+    });
+  });
+
+  it("skips issues mining when repository cannot be resolved", async () => {
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      dependencies: [createDependency()],
+    });
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 55,
+      riskLevel: "MEDIUM",
+      summary: "done",
+    });
+    const runGitHubMiner = vi.fn().mockResolvedValue({
+      ...gitHubMetrics,
+      repository: {
+        ...gitHubMetrics.repository,
+        owner: "",
+        name: "",
+      },
+    });
+    const runIssuesMiningMock = vi.fn();
+
+    await processAnalysisJob(job, {
+      prisma,
+      runAnalysis,
+      runGitHubMiner,
+      runIssuesMining: runIssuesMiningMock,
+      logger,
+    });
+
+    expect(runIssuesMiningMock).not.toHaveBeenCalled();
+    expect(runAnalysis).toHaveBeenCalled();
+  });
+
+  it("reuses issues mining result for dependencies in the same repository", async () => {
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      dependencies: [
+        { ...createDependency(), id: "dependency-1", name: "react" },
+        { ...createDependency(), id: "dependency-2", name: "react-dom" },
+      ],
+    });
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 80,
+      riskLevel: "LOW",
+      summary: "done",
+    });
+    const runGitHubMiner = vi
+      .fn()
+      .mockResolvedValue({
+        ...gitHubMetrics,
+        repository: {
+          ...gitHubMetrics.repository,
+          owner: "facebook",
+          name: "react",
+          fullName: "facebook/react",
+        },
+      });
+    const runIssuesMiningMock = vi.fn().mockResolvedValue(issueResult);
+
+    await processAnalysisJob(job, {
+      prisma,
+      runAnalysis,
+      runGitHubMiner,
+      runIssuesMining: runIssuesMiningMock,
+      logger,
+    });
+
+    expect(runGitHubMiner).toHaveBeenCalledTimes(2);
+    expect(runIssuesMiningMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("stores unknown message for non-Error failures", async () => {
+    const prisma = createPrismaMock({
+      id: "analysis-1",
+      dependencies: [createDependency()],
+    });
+    const runAnalysis = vi.fn().mockResolvedValue({
+      globalScore: 60,
+      riskLevel: "MEDIUM",
+      summary: "done",
+    });
+    const runGitHubMiner = vi.fn().mockRejectedValue("boom");
+
+    await processAnalysisJob(job, {
+      prisma,
+      runAnalysis,
+      runGitHubMiner,
+      logger,
+    });
+
+    expect(runAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dependencies: [
+          expect.objectContaining({
+            warnings: expect.arrayContaining(["Unknown enrichment error"]),
+          }),
+        ],
+      })
+    );
   });
 });
