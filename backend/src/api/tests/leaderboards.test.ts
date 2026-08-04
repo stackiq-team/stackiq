@@ -66,4 +66,13 @@ describe("GET /leaderboards", () => {
     expect(response.statusCode).toBe(500);
     expect(response.body.message).toBe("GitHub unavailable");
   });
+
+  it("passes forceRefresh=true to leaderboard service", async () => {
+    getLeaderboardsMock.mockResolvedValue(mockCache);
+
+    const response = await request(app).get("/leaderboards?forceRefresh=true");
+
+    expect(response.statusCode).toBe(200);
+    expect(getLeaderboardsMock).toHaveBeenCalledWith(true);
+  });
 });

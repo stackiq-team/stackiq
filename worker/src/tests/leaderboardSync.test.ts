@@ -247,4 +247,275 @@ describe("leaderboardSync", () => {
     expect(setIntervalMock).toHaveBeenCalledWith(expect.any(Function), 7 * 24 * 60 * 60 * 1000);
     expect(enqueueAnalysisJobMock).not.toHaveBeenCalled();
   });
+
+  it("logs refresh failure when token is missing", async () => {
+    delete process.env.GITHUB_API_TOKEN;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const prisma = {
+      analysis: { create: vi.fn() },
+      leaderboardRepository: {
+        findUnique: vi.fn(),
+        update: vi.fn(),
+        create: vi.fn(),
+      },
+    } as any;
+
+    await refreshLeaderboardRepositories(prisma);
+
+    const scheduledRun = setIntervalMock.mock.calls[0]?.[0] as (() => Promise<void>) | undefined;
+    expect(scheduledRun).toEqual(expect.any(Function));
+    await scheduledRun?.();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[worker] Explore refresh failed:")
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("handles github search response errors", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    createRequestMock((body) => {
+      const payload = JSON.parse(body) as { query: string };
+      if (payload.query.includes("SearchRepositories")) {
+        return { payload: "boom", statusCode: 500 };
+      }
+      return { payload: { data: {} } };
+    });
+
+    const prisma = {
+      analysis: { create: vi.fn() },
+      leaderboardRepository: {
+        findUnique: vi.fn(),
+        update: vi.fn(),
+        create: vi.fn(),
+      },
+    } as any;
+
+    await refreshLeaderboardRepositories(prisma);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[worker] Explore refresh failed:")
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("handles github search GraphQL errors payload", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    createRequestMock((body) => {
+      const payload = JSON.parse(body) as { query: string };
+      if (payload.query.includes("SearchRepositories")) {
+        return {
+          payload: {
+            errors: [{ message: "rate limited" }],
+          },
+        };
+      }
+      return { payload: { data: {} } };
+    });
+
+    const prisma = {
+      analysis: { create: vi.fn() },
+      leaderboardRepository: {
+        findUnique: vi.fn(),
+        update: vi.fn(),
+        create: vi.fn(),
+      },
+    } as any;
+
+    await refreshLeaderboardRepositories(prisma);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[worker] Explore refresh failed:")
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("handles package fetch without token and skips analysis creation", async () => {
+    createRequestMock((body) => {
+      const payload = JSON.parse(body) as { query: string };
+
+      if (payload.query.includes("SearchRepositories")) {
+        delete process.env.GITHUB_API_TOKEN;
+        return {
+          payload: {
+            data: {
+              search: {
+                nodes: [
+                  {
+                    fullName: "owner/repo",
+                    name: "repo",
+                    owner: "owner",
+                    description: "desc",
+                    url: "https://github.com/owner/repo",
+                    createdAt: "2020-01-01T00:00:00.000Z",
+                    pushedAt: null,
+                    stargazerCount: 0,
+                    forkCount: 0,
+                    watchers: { totalCount: 0 },
+                    issues: { totalCount: 0 },
+                    pullRequests: { totalCount: 0 },
+                    license: null,
+                    primaryLanguage: null,
+                    topics: [],
+                    repositoryTopics: { edges: [] },
+                  },
+                ],
+              },
+            },
+          },
+        };
+      }
+
+      return { payload: { data: {} } };
+    });
+
+    const analysisCreateMock = vi.fn();
+    const prisma = {
+      analysis: { create: analysisCreateMock },
+      leaderboardRepository: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn(),
+        create: vi.fn().mockResolvedValue({}),
+      },
+    } as any;
+
+    await refreshLeaderboardRepositories(prisma);
+
+    expect(analysisCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("skips analysis creation when package json has no dependencies", async () => {
+    createRequestMock((body) => {
+      const payload = JSON.parse(body) as { query: string };
+
+      if (payload.query.includes("SearchRepositories")) {
+        return {
+          payload: {
+            data: {
+              search: {
+                nodes: [
+                  {
+                    nameWithOwner: "owner/repo",
+                    name: "repo",
+                    owner: { login: "owner" },
+                    description: "desc",
+                    url: "https://github.com/owner/repo",
+                    createdAt: "invalid-date",
+                    pushedAt: "invalid-date",
+                    stargazerCount: 10,
+                    forkCount: 1,
+                    watchers: { totalCount: 1 },
+                    issues: { totalCount: 1 },
+                    pullRequests: { totalCount: 1 },
+                    licenseInfo: null,
+                    primaryLanguage: null,
+                    repositoryTopics: { edges: [] },
+                  },
+                ],
+              },
+            },
+          },
+        };
+      }
+
+      if (payload.query.includes("PackageJson")) {
+        return {
+          payload: {
+            data: {
+              repository: {
+                object: {
+                  text: JSON.stringify({ name: "repo" }),
+                },
+              },
+            },
+          },
+        };
+      }
+
+      return { payload: { data: {} } };
+    });
+
+    const analysisCreateMock = vi.fn();
+    const prisma = {
+      analysis: { create: analysisCreateMock },
+      leaderboardRepository: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn(),
+        create: vi.fn().mockResolvedValue({}),
+      },
+    } as any;
+
+    await refreshLeaderboardRepositories(prisma);
+
+    expect(analysisCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("handles invalid package json without creating analysis", async () => {
+    createRequestMock((body) => {
+      const payload = JSON.parse(body) as { query: string; variables?: { owner?: string; name?: string } };
+
+      if (payload.query.includes("SearchRepositories")) {
+        return {
+          payload: {
+            data: {
+              search: {
+                nodes: [
+                  {
+                    nameWithOwner: "owner/repo",
+                    name: "repo",
+                    owner: { login: "owner" },
+                    description: "repo",
+                    url: "https://github.com/owner/repo",
+                    createdAt: "2020-01-01T00:00:00.000Z",
+                    pushedAt: "2026-07-01T00:00:00.000Z",
+                    stargazerCount: 1,
+                    forkCount: 1,
+                    watchers: { totalCount: 1 },
+                    issues: { totalCount: 1 },
+                    pullRequests: { totalCount: 1 },
+                    licenseInfo: null,
+                    primaryLanguage: null,
+                    repositoryTopics: { edges: [] },
+                  },
+                ],
+              },
+            },
+          },
+        };
+      }
+
+      if (payload.query.includes("PackageJson")) {
+        return {
+          payload: {
+            data: {
+              repository: {
+                object: {
+                  text: "{bad-json",
+                },
+              },
+            },
+          },
+        };
+      }
+
+      return { payload: { data: {} } };
+    });
+
+    const analysisCreateMock = vi.fn();
+    const prisma = {
+      analysis: { create: analysisCreateMock },
+      leaderboardRepository: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn(),
+        create: vi.fn().mockResolvedValue({}),
+      },
+    } as any;
+
+    await refreshLeaderboardRepositories(prisma);
+
+    expect(analysisCreateMock).not.toHaveBeenCalled();
+  });
 });

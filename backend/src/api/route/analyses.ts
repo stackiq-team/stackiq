@@ -200,10 +200,6 @@ router.get("/:resultToken", async (req: Request, res: Response) => {
       ? resultTokenRaw[0]
       : resultTokenRaw;
 
-    if (!resultToken) {
-      return res.status(400).json({ message: "Result token is required" });
-    }
-
     const analysis = await prisma.analysis.findUnique({
       where: { resultToken },
       include: {

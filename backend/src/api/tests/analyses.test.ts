@@ -213,6 +213,48 @@ describe("POST /analyses", () => {
     expect(prismaMock.$executeRaw).not.toHaveBeenCalled();
     expect(enqueueAnalysisJobMock).not.toHaveBeenCalled();
   });
+
+  it("rejects requests with no uploaded file", async () => {
+    const response = await request(app)
+      .post("/analyses")
+      .field("email", "test@example.com");
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body.message).toBe("File is required");
+    expect(prismaMock.analysis.create).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when the uploaded file is not valid json", async () => {
+    const response = await request(app)
+      .post("/analyses")
+      .attach("file", Buffer.from("{invalid-json"), "stack.json");
+
+    expect(response.statusCode).toBe(500);
+    expect(response.body.message).toMatch(/Unexpected token|Expected property name/i);
+    expect(prismaMock.analysis.create).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when analysis creation fails", async () => {
+    prismaMock.analysis.create.mockRejectedValueOnce(new Error("db failed"));
+
+    const response = await request(app)
+      .post("/analyses")
+      .field("email", "test@example.com")
+      .attach(
+        "file",
+        Buffer.from(
+          JSON.stringify({
+            dependencies: {
+              react: "^19.0.0",
+            },
+          })
+        ),
+        "stack.json"
+      );
+
+    expect(response.statusCode).toBe(500);
+    expect(response.body.message).toBe("db failed");
+  });
 });
 
 describe("GET /analyses/:resultToken", () => {
@@ -323,5 +365,14 @@ describe("GET /analyses/:resultToken", () => {
 
     expect(response.statusCode).toBe(404);
     expect(response.body.message).toBe("Analysis not found");
+  });
+
+  it("returns 500 when fetching an analysis fails", async () => {
+    prismaMock.analysis.findUnique.mockRejectedValueOnce(new Error("lookup failed"));
+
+    const response = await request(app).get("/analyses/result-token-1");
+
+    expect(response.statusCode).toBe(500);
+    expect(response.body.message).toBe("lookup failed");
   });
 });

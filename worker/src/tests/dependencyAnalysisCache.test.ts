@@ -84,6 +84,24 @@ describe("dependencyAnalysisCache", () => {
     expect(DEFAULT_PARTIAL_DEPENDENCY_CACHE_TTL_DAYS).toBe(1);
   });
 
+  it("falls back to defaults when cache env values are invalid", () => {
+    process.env.DEPENDENCY_CACHE_TTL_DAYS = "0";
+    process.env.PARTIAL_DEPENDENCY_CACHE_TTL_DAYS = "-1";
+    process.env.DEPENDENCY_CACHE_LOCK_WAIT_MS = "not-a-number";
+
+    expect(getDependencyCacheTtlDays()).toBe(DEFAULT_DEPENDENCY_CACHE_TTL_DAYS);
+    expect(getPartialDependencyCacheTtlDays()).toBe(DEFAULT_PARTIAL_DEPENDENCY_CACHE_TTL_DAYS);
+    expect(getDependencyCacheLockWaitMs()).toBe(5 * 60 * 1000);
+  });
+
+  it("normalizes blank repository names and empty version buckets", () => {
+    const manager = createManager();
+    const lookup = manager.buildLookup({ name: "pkg", versionRequirement: "  ^  " }, "   ");
+
+    expect(lookup.repositoryFullName).toBeNull();
+    expect(lookup.versionBucket).toBe("unknown-version");
+  });
+
   it("returns cached analysis data and refreshes last access time", async () => {
     const lookup = {
       ecosystem: "npm",
@@ -258,6 +276,55 @@ describe("dependencyAnalysisCache", () => {
     expect(await manager.deleteExpired(new Date("2025-12-31T00:00:00Z"))).toBe(3);
   });
 
+  it("does not persist when GitHub metrics are missing", async () => {
+    const upsert = vi.fn().mockResolvedValue(undefined);
+    const manager = createManager({ upsert });
+
+    await manager.save(
+      {
+        ecosystem: "npm",
+        packageManager: "npm",
+        dependencyName: "left-pad",
+        versionRequirement: "1.0.0",
+        versionBucket: "1.0.0",
+        repositoryFullName: "example/repo",
+        issuesConfigHash: "hash",
+        cacheVersion: "v2",
+      },
+      {
+        dependency: { id: "dep-2", name: "left-pad", versionRequirement: "1.0.0", type: "DEPENDENCY" },
+        gitHubMetrics: null,
+        issueMetrics: null,
+        issueData: null,
+        warnings: [],
+      } as any,
+      {
+        dependencyId: "dep-2",
+        score: 50,
+        riskLevel: "MEDIUM",
+        breakdown: {
+          popularityScore: 50,
+          maintenanceScore: 50,
+          resolutionQualityScore: 50,
+          normalizedInputs: {},
+        },
+        warnings: [],
+      } as any,
+      null
+    );
+
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("invalidates a cache entry by key", async () => {
+    const deleteMock = vi.fn().mockResolvedValue(undefined);
+    const manager = createManager({ delete: deleteMock });
+
+    await manager.invalidate("cache-key-1");
+
+    expect(deleteMock).toHaveBeenCalledWith({ where: { cacheKey: "cache-key-1" } });
+  });
+
   it("acquires and releases a redis lock when available", async () => {
     let storedToken = "";
     const set = vi.fn().mockImplementation(async (_key: string, value: string) => {
@@ -276,5 +343,120 @@ describe("dependencyAnalysisCache", () => {
     expect(set).toHaveBeenCalled();
     expect(get).toHaveBeenCalled();
     expect(del).toHaveBeenCalled();
+  });
+
+  it("returns a no-op release function when no lock client is configured", async () => {
+    const manager = createManager();
+
+    const release = await manager.acquireLock("cache-key");
+    await expect(release()).resolves.toBeUndefined();
+  });
+
+  it("does not delete lock when token changes before release", async () => {
+    let firstToken = "";
+    const set = vi.fn().mockImplementation(async (_key: string, value: string) => {
+      firstToken = value;
+      return "OK";
+    });
+    const get = vi.fn().mockResolvedValue("different-token");
+    const del = vi.fn().mockResolvedValue(0);
+    const manager = createManager({
+      lockClient: { set, get, del },
+    });
+
+    const release = await manager.acquireLock("cache-key");
+    expect(firstToken).not.toBe("");
+    await release();
+
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("throws when lock cannot be acquired before timeout", async () => {
+    process.env.DEPENDENCY_CACHE_LOCK_WAIT_MS = "1";
+    const set = vi.fn().mockResolvedValue(null);
+    const manager = createManager({
+      lockClient: {
+        set,
+        get: vi.fn().mockResolvedValue(null),
+        del: vi.fn().mockResolvedValue(0),
+      },
+    });
+
+    await expect(manager.acquireLock("cache-key")).rejects.toThrow(
+      "Timed out waiting for dependency cache lock: cache-key"
+    );
+    expect(set).toHaveBeenCalled();
+  });
+
+  it("returns null when a cache row cannot be converted to expected shape", async () => {
+    const findUnique = vi.fn().mockResolvedValue({
+      cacheKey: "cache-key",
+      githubMinerRaw: { dependencyId: "dep-1", repository: { fullName: "owner/repo" } },
+      issuesMiningRaw: null,
+      score: null,
+      riskLevel: null,
+      popularityScore: null,
+      maintenanceScore: null,
+      resolutionQualityScore: null,
+      normalizedMetrics: null,
+      warnings: null,
+      status: "SUCCESS",
+      expiresAt: new Date("2026-01-02T00:00:00Z"),
+    });
+    const update = vi.fn().mockResolvedValue(undefined);
+    const manager = createManager({ findUnique, update });
+
+    const result = await manager.findCache({
+      ecosystem: "npm",
+      packageManager: "npm",
+      dependencyName: "react",
+      versionRequirement: "18.2.0",
+      versionBucket: "18.2.0",
+      repositoryFullName: "facebook/react",
+      issuesConfigHash: "hash",
+      cacheVersion: "v2",
+    });
+
+    expect(result).toBeNull();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("returns cache entry with null issue result when issue payload is invalid", async () => {
+    const findUnique = vi.fn().mockResolvedValue({
+      cacheKey: "cache-key",
+      githubMinerRaw: {
+        dependencyId: "dependency-1",
+        repository: { fullName: "facebook/react" },
+      },
+      issuesMiningRaw: ["bad-shape"],
+      score: 88,
+      riskLevel: "LOW",
+      popularityScore: 80,
+      maintenanceScore: 90,
+      resolutionQualityScore: 70,
+      normalizedMetrics: { popularityScore: 80 },
+      warnings: ["warn"],
+      status: "SUCCESS",
+      expiresAt: new Date("2026-01-02T00:00:00Z"),
+    });
+    const update = vi.fn().mockResolvedValue(undefined);
+    const manager = createManager({ findUnique, update });
+
+    const result = await manager.findCache({
+      ecosystem: "npm",
+      packageManager: "npm",
+      dependencyName: "react",
+      versionRequirement: "18.2.0",
+      versionBucket: "18.2.0",
+      repositoryFullName: "facebook/react",
+      issuesConfigHash: "hash",
+      cacheVersion: "v2",
+    });
+
+    expect(result).toMatchObject({
+      cacheKey: "cache-key",
+      issueResult: null,
+    });
+    expect(update).toHaveBeenCalledTimes(1);
   });
 });
