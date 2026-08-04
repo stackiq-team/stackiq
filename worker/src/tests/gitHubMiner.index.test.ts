@@ -329,7 +329,7 @@ describe("runGitHubMinerCommand", () => {
     const result = await runGitHubMinerCommand("error-pkg");
 
     expect(result.raw).toHaveLength(1);
-    expect(result.raw[0].name).toBe("error-pkg");
+    expect(result.raw[0]!.name).toBe("error-pkg");
   });
 
   it("falls back when GitHub response has no data field", async () => {
@@ -356,7 +356,7 @@ describe("runGitHubMinerCommand", () => {
     const result = await runGitHubMinerCommand("no-data-pkg");
 
     expect(result.raw).toHaveLength(1);
-    expect(result.raw[0].name).toBe("no-data-pkg");
+    expect(result.raw[0]!.name).toBe("no-data-pkg");
   });
 
   it("handles invalid npm metadata/date and returns npm fallback", async () => {

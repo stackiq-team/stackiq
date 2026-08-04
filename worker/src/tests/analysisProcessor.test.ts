@@ -35,7 +35,7 @@ function createPrismaMock(
     email:"test@example.com",
     dependencies: [],
   }
-) {
+): any {
   return {
     analysis: {
       findUnique: vi.fn().mockResolvedValue(analysis),

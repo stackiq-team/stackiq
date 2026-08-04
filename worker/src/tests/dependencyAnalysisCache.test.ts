@@ -19,11 +19,7 @@ function createManager(overrides?: {
   upsert?: ReturnType<typeof vi.fn>;
   delete?: ReturnType<typeof vi.fn>;
   deleteMany?: ReturnType<typeof vi.fn>;
-  lockClient?: {
-    set: ReturnType<typeof vi.fn>;
-    get: ReturnType<typeof vi.fn>;
-    del: ReturnType<typeof vi.fn>;
-  };
+  lockClient?: any;
 }) {
   const prisma = {
     dependencyAnalysisCache: {
@@ -58,7 +54,10 @@ describe("dependencyAnalysisCache", () => {
 
   it("builds lookups and cache keys from dependency data", () => {
     const manager = createManager();
-    const lookup = manager.buildLookup({ name: "React", versionRequirement: "^18.2.0" }, "facebook/react");
+    const lookup = manager.buildLookup(
+      { id: "dep-1", name: "React", versionRequirement: "^18.2.0", type: "DEPENDENCY" as any },
+      "facebook/react"
+    );
 
     expect(lookup).toMatchObject({
       ecosystem: "npm",
@@ -96,7 +95,10 @@ describe("dependencyAnalysisCache", () => {
 
   it("normalizes blank repository names and empty version buckets", () => {
     const manager = createManager();
-    const lookup = manager.buildLookup({ name: "pkg", versionRequirement: "  ^  " }, "   ");
+    const lookup = manager.buildLookup(
+      { id: "dep-2", name: "pkg", versionRequirement: "  ^  ", type: "DEPENDENCY" as any },
+      "   "
+    );
 
     expect(lookup.repositoryFullName).toBeNull();
     expect(lookup.versionBucket).toBe("unknown-version");

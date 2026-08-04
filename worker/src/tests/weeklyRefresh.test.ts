@@ -431,9 +431,9 @@ describe("startWeeklyRefreshScheduler", () => {
   });
 
   it("skips overlapping runs while a previous run is still in progress", async () => {
-    let releaseQuery: (() => void) | null = null;
+    let resolveQuery: ((value: unknown[]) => void) | undefined;
     const queryPromise = new Promise<unknown[]>((resolve) => {
-      releaseQuery = () => resolve([]);
+      resolveQuery = resolve;
     });
 
     const logger = {
@@ -462,7 +462,9 @@ describe("startWeeklyRefreshScheduler", () => {
       "[worker] Weekly refresh run skipped: previous run still in progress."
     );
 
-    releaseQuery?.();
+    if (resolveQuery) {
+      resolveQuery([]);
+    }
     await firstRun;
     scheduler.stop();
   });
