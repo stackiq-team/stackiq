@@ -9,7 +9,7 @@ export const defaultLanguage: Language = "en";
 
 export const translations = {
   en: {
-    "nav.analyze": "Analyze",
+    "nav.analyze": "Analysis",
     "nav.explore": "Explore",
     "nav.language": "Language",
     "common.retry": "Retry",
