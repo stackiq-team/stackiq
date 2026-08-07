@@ -35,8 +35,13 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#39;");
 }
 
+function getPublicAppUrl() {
+  const configuredBaseUrl = process.env.APP_PUBLIC_URL || process.env.FRONTEND_URL || "https://stackiq.dev";
+  return configuredBaseUrl.trim().replace(/\/+$/, "");
+}
+
 function getResultUrl(analysisPageToken: string) {
-  const baseUrl = "https://stackiq.dev";
+  const baseUrl = getPublicAppUrl();
   return analysisPageToken.trim()
     ? `${baseUrl}/results/${encodeURIComponent(analysisPageToken)}`
     : `${baseUrl}/results`;
@@ -209,9 +214,7 @@ export async function sendResultEmail(
   });
 
   try {
-    const resultUrl = analysisPageToken.trim()
-      ? `https://stackiq.dev/results/${encodeURIComponent(analysisPageToken)}`
-      : "https://stackiq.dev/results";
+    const resultUrl = getResultUrl(analysisPageToken);
 
     const recipients = [email];
     await transporter.sendMail({
