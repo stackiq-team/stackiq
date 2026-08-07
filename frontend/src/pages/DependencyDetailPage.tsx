@@ -5,6 +5,7 @@ import type { AnalysisLookupResponse } from "../service/ApiService";
 import { exportDependencyReport } from "../reporting/dependencyReport";
 import "./DependencyDetailPage.css";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
+import { useTranslation } from "../i18n/LanguageContext";
 
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 type DetailTab = "signals" | "score" | "relationships" | "issues";
@@ -26,38 +27,41 @@ interface DependencyDetail {
 function relationshipAnalysisStatus(
   analysisStatus: AnalysisLookupResponse["analysis"]["status"],
   dependencyName: string,
-  dependencyRelationshipCount: number
+  dependencyRelationshipCount: number,
+  t: ReturnType<typeof useTranslation>["t"]
 ) {
   if (analysisStatus === "FAILED") {
     return {
-      label: "Failed",
+      label: t("status.failed"),
       className: "relationship-status-failed",
-      message: "Relationship analysis did not complete because the analysis failed.",
+      message: t("detail.relationshipFailedMessage"),
     };
   }
 
   if (analysisStatus !== "COMPLETED") {
     return {
-      label: "Running",
+      label: t("detail.relationshipRunning"),
       className: "relationship-status-running",
-      message: "Relationship analysis is still running. These counts will appear after the relationship pass finishes.",
+      message: t("detail.relationshipRunningMessage"),
     };
   }
 
   if (dependencyRelationshipCount === 0) {
     return {
-      label: "Not available",
+      label: t("detail.relationshipNotAvailable"),
       className: "relationship-status-waiting",
-      message: `${dependencyName} was not checked against other dependencies.`,
+      message: t("detail.relationshipNotChecked", { dependencyName }),
     };
   }
 
   return {
-    label: "Completed",
+    label: t("status.completed"),
     className: "relationship-status-completed",
-    message: `${dependencyName} was checked against ${dependencyRelationshipCount} other ${
-      dependencyRelationshipCount === 1 ? "dependency" : "dependencies"
-    }.`,
+    message: t("detail.relationshipCompletedMessage", {
+      dependencyName,
+      count: dependencyRelationshipCount,
+      label: t("common.dependencies").toLowerCase(),
+    }),
   };
 }
 
@@ -67,10 +71,10 @@ function riskClassName(risk: RiskLevel): string {
   return "risk-high";
 }
 
-function riskLabel(risk: RiskLevel): string {
-  if (risk === "LOW") return "Low";
-  if (risk === "MEDIUM") return "Medium";
-  return "High";
+function riskLabel(risk: RiskLevel, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (risk === "LOW") return t("risk.low");
+  if (risk === "MEDIUM") return t("risk.medium");
+  return t("risk.high");
 }
 
 function getRecord(value: unknown): Record<string, unknown> | null {
@@ -98,9 +102,9 @@ function formatDate(value: unknown) {
   return parsedDate.toLocaleDateString();
 }
 
-function formatBoolean(value: unknown) {
-  if (value === true) return "Yes";
-  if (value === false) return "No";
+function formatBoolean(value: unknown, t: ReturnType<typeof useTranslation>["t"]) {
+  if (value === true) return t("common.yes");
+  if (value === false) return t("common.no");
   return "-";
 }
 
@@ -108,8 +112,8 @@ function formatMetric(value: number | null | undefined) {
   return typeof value === "number" ? value.toLocaleString() : "-";
 }
 
-function formatScoreValue(value: number | null | undefined) {
-  return typeof value === "number" ? `${value}/100` : "Not available";
+function formatScoreValue(value: number | null | undefined, t: ReturnType<typeof useTranslation>["t"]) {
+  return typeof value === "number" ? `${value}/100` : t("common.notAvailable");
 }
 
 function weightedContribution(value: number | null | undefined, weight: number) {
@@ -125,12 +129,12 @@ function formatPercentValue(value: unknown) {
   return typeof value === "number" ? `${Math.round(value * 100)}%` : "-";
 }
 
-function scoreSignalLabel(value: number | null | undefined) {
-  if (typeof value !== "number") return "Not available";
-  if (value >= 80) return "Strong";
-  if (value >= 60) return "Good";
-  if (value >= 40) return "Weak";
-  return "Poor";
+function scoreSignalLabel(value: number | null | undefined, t: ReturnType<typeof useTranslation>["t"]) {
+  if (typeof value !== "number") return t("common.notAvailable");
+  if (value >= 80) return t("detail.strong");
+  if (value >= 60) return t("detail.good");
+  if (value >= 40) return t("detail.weak");
+  return t("detail.poor");
 }
 
 function scoreSignalClassName(value: number | null | undefined) {
@@ -141,11 +145,11 @@ function scoreSignalClassName(value: number | null | undefined) {
   return "score-input-poor";
 }
 
-function relationshipLabel(type: RelationshipEntry["relationshipType"]) {
-  if (type === "KNOWN_INCOMPATIBILITY") return "Known Incompatibility";
-  if (type === "POSSIBLE_CONFLICT") return "Possible Conflict";
-  if (type === "INTEGRATION_MENTION") return "Integration Mention";
-  return "Unknown";
+function relationshipLabel(type: RelationshipEntry["relationshipType"], t: ReturnType<typeof useTranslation>["t"]) {
+  if (type === "KNOWN_INCOMPATIBILITY") return t("detail.knownIncompatibility");
+  if (type === "POSSIBLE_CONFLICT") return t("detail.possibleConflict");
+  if (type === "INTEGRATION_MENTION") return t("detail.integrationMention");
+  return t("common.unknown");
 }
 
 function relationshipClassName(type: RelationshipEntry["relationshipType"]) {
@@ -474,6 +478,7 @@ function buildBacklogHealthData(summaries: IssueSummary[]) {
 }
 
 export default function DependencyDetailPage() {
+  const { language, t } = useTranslation();
   const { resultToken, dependencyName } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -492,7 +497,7 @@ export default function DependencyDetailPage() {
 
   const load = async () => {
     if (!resultToken || !dependencyName) {
-      setError("Missing result token or dependency name in URL.");
+      setError(t("detail.missingParams"));
       setLoading(false);
       return;
     }
@@ -504,7 +509,7 @@ export default function DependencyDetailPage() {
       const response = await fetchAnalysisByResultToken(resultToken);
 
       if (!response.success || !response.data?.analysis?.result) {
-        setError(response.message || "Unable to load analysis.");
+        setError(response.message || t("result.unableToLoad"));
         setLoading(false);
         return;
       }
@@ -517,7 +522,7 @@ export default function DependencyDetailPage() {
       );
 
       if (!depScore) {
-        setError("Dependency not found in analysis results.");
+        setError(t("detail.dependencyNotFound"));
         setLoading(false);
         return;
       }
@@ -536,14 +541,14 @@ export default function DependencyDetailPage() {
       });
       setLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setError(err instanceof Error ? err.message : t("detail.unexpectedError"));
       setLoading(false);
     }
   };
 
   useEffect(() => {
     void load();
-  }, [resultToken, dependencyName]);
+  }, [resultToken, dependencyName, t]);
 
   useEffect(() => {
     const updateChartMode = () => setIsCompactCharts(window.innerWidth <= 560);
@@ -580,8 +585,8 @@ export default function DependencyDetailPage() {
   if (loading) {
     return (
       <section className="dependency-detail-page">
-        <h1>Dependency Details</h1>
-        <p>Loading information...</p>
+        <h1>{t("detail.title")}</h1>
+        <p>{t("detail.loading")}</p>
       </section>
     );
   }
@@ -589,14 +594,14 @@ export default function DependencyDetailPage() {
   if (error) {
     return (
       <section className="dependency-detail-page">
-        <h1>Dependency Details</h1>
+        <h1>{t("detail.title")}</h1>
         <p className="error-text">{error}</p>
         <div className="detail-actions">
           <button className="button" onClick={() => void load()}>
-            Retry
+            {t("common.retry")}
           </button>
           <Link className="button button-secondary" to={`/results/${resultToken}`}>
-            Back to results
+            {t("common.backToResults")}
           </Link>
         </div>
       </section>
@@ -606,8 +611,8 @@ export default function DependencyDetailPage() {
   if (!dependency) {
     return (
       <section className="dependency-detail-page">
-        <h1>Dependency Details</h1>
-        <p>No dependency found.</p>
+        <h1>{t("detail.title")}</h1>
+        <p>{t("detail.noDependency")}</p>
       </section>
     );
   }
@@ -671,7 +676,8 @@ export default function DependencyDetailPage() {
   const relationshipStatus = relationshipAnalysisStatus(
     dependency.analysisStatus,
     dependency.name,
-    dependency.relationships.length
+    dependency.relationships.length,
+    t
   );
   const showRelationshipCounts = !relationshipAnalysisPending && relationshipChecksAvailable;
   const relationshipCounts = visibleRelationships.reduce(
@@ -685,51 +691,51 @@ export default function DependencyDetailPage() {
   );
   const scoreBreakdown = [
     {
-      label: "Package health",
+      label: t("detail.packageHealth"),
       score: dependency.scoreEntry?.popularityScore ?? null,
       weight: 0.5,
-      description: "NPM signals: downloads, release age, package age, versions, dependency count, license, repository, README.",
+      description: t("detail.packageHealthDescription"),
       inputs: [
-        { label: "Weekly downloads", key: "weeklyDownloads", raw: formatMetric(typeof npmMetrics?.weeklyDownloads === "number" ? npmMetrics.weeklyDownloads : null) },
-        { label: "Latest publish age", key: "latestPublishAge", raw: `${formatMetric(typeof npmMetrics?.latestPublishAgeDays === "number" ? npmMetrics.latestPublishAgeDays : null)} days` },
-        { label: "Package age", key: "packageAge", raw: `${formatMetric(typeof npmMetrics?.packageAgeDays === "number" ? npmMetrics.packageAgeDays : null)} days` },
-        { label: "Version count", key: "versionCount", raw: formatMetric(typeof npmMetrics?.versionCount === "number" ? npmMetrics.versionCount : null) },
-        { label: "Dependency count", key: "dependencyCount", raw: formatMetric(typeof npmMetrics?.dependencyCount === "number" ? npmMetrics.dependencyCount : null) },
-        { label: "NPM license", key: "npmLicense", raw: formatBoolean(npmMetrics?.hasLicense) },
-        { label: "Repository metadata", key: "npmRepository", raw: formatBoolean(npmMetrics?.hasRepository) },
-        { label: "README", key: "npmReadme", raw: formatBoolean(npmMetrics?.hasReadme) },
+        { label: t("detail.weeklyDownloads"), key: "weeklyDownloads", raw: formatMetric(typeof npmMetrics?.weeklyDownloads === "number" ? npmMetrics.weeklyDownloads : null) },
+        { label: t("detail.latestPublishAge"), key: "latestPublishAge", raw: `${formatMetric(typeof npmMetrics?.latestPublishAgeDays === "number" ? npmMetrics.latestPublishAgeDays : null)} ${t("common.days")}` },
+        { label: t("detail.packageAge"), key: "packageAge", raw: `${formatMetric(typeof npmMetrics?.packageAgeDays === "number" ? npmMetrics.packageAgeDays : null)} ${t("common.days")}` },
+        { label: t("detail.versionCount"), key: "versionCount", raw: formatMetric(typeof npmMetrics?.versionCount === "number" ? npmMetrics.versionCount : null) },
+        { label: t("detail.dependencyCount"), key: "dependencyCount", raw: formatMetric(typeof npmMetrics?.dependencyCount === "number" ? npmMetrics.dependencyCount : null) },
+        { label: t("detail.npmLicense"), key: "npmLicense", raw: formatBoolean(npmMetrics?.hasLicense, t) },
+        { label: t("detail.repositoryMetadata"), key: "npmRepository", raw: formatBoolean(npmMetrics?.hasRepository, t) },
+        { label: "README", key: "npmReadme", raw: formatBoolean(npmMetrics?.hasReadme, t) },
       ],
     },
     {
-      label: "Repository health",
+      label: t("detail.repositoryHealth"),
       score: dependency.scoreEntry?.maintenanceScore ?? null,
       weight: 0.3,
-      description: "GitHub signals: stars, forks, watchers, contributors, project age, pull requests, and repository license.",
+      description: t("detail.repositoryHealthDescription"),
       inputs: [
-        { label: "Stars", key: "stars", raw: formatMetric(typeof githubMetrics?.stars === "number" ? githubMetrics.stars : null) },
-        { label: "Forks", key: "forks", raw: formatMetric(typeof githubMetrics?.forks === "number" ? githubMetrics.forks : null) },
-        { label: "Watchers", key: "watchers", raw: formatMetric(typeof githubMetrics?.watchers === "number" ? githubMetrics.watchers : null) },
-        { label: "Contributors", key: "contributors", raw: formatMetric(typeof githubMetrics?.contributors === "number" ? githubMetrics.contributors : null) },
-        { label: "Project age", key: "projectAge", raw: `${formatMetric(typeof githubMetrics?.projectAgeDays === "number" ? githubMetrics.projectAgeDays : null)} days` },
-        { label: "Pull requests", key: "pullRequests", raw: formatMetric(typeof githubMetrics?.pullRequests === "number" ? githubMetrics.pullRequests : null) },
-        { label: "GitHub license", key: "githubLicense", raw: getStringValue(githubMetrics?.license) ?? "-" },
+        { label: t("result.stars"), key: "stars", raw: formatMetric(typeof githubMetrics?.stars === "number" ? githubMetrics.stars : null) },
+        { label: t("result.forks"), key: "forks", raw: formatMetric(typeof githubMetrics?.forks === "number" ? githubMetrics.forks : null) },
+        { label: t("detail.watchers"), key: "watchers", raw: formatMetric(typeof githubMetrics?.watchers === "number" ? githubMetrics.watchers : null) },
+        { label: t("detail.contributors"), key: "contributors", raw: formatMetric(typeof githubMetrics?.contributors === "number" ? githubMetrics.contributors : null) },
+        { label: t("detail.projectAge"), key: "projectAge", raw: `${formatMetric(typeof githubMetrics?.projectAgeDays === "number" ? githubMetrics.projectAgeDays : null)} ${t("common.days")}` },
+        { label: t("detail.pullRequests"), key: "pullRequests", raw: formatMetric(typeof githubMetrics?.pullRequests === "number" ? githubMetrics.pullRequests : null) },
+        { label: t("detail.githubLicense"), key: "githubLicense", raw: getStringValue(githubMetrics?.license) ?? "-" },
       ],
     },
     {
-      label: "Issue resolution",
+      label: t("detail.issueResolution"),
       score: dependency.scoreEntry?.resolutionQualityScore ?? null,
       weight: 0.2,
-      description: "Balanced issue-mining signals: median resolution, maintainer response, closure health, stale backlog, and sample coverage.",
+      description: t("detail.issueResolutionDescription"),
       inputs: [
-        { label: "Resolution time", key: "resolutionTime", raw: `${formatMetric(typeof issueMetrics?.medianResolutionTimeDays === "number" ? issueMetrics.medianResolutionTimeDays : typeof issueMetrics?.averageResolutionTimeDays === "number" ? issueMetrics.averageResolutionTimeDays : null)} days median` },
-        { label: "Maintainer response time", key: "firstResponseTime", raw: `${formatMetric(typeof issueMetrics?.medianFirstResponseTimeDays === "number" ? issueMetrics.medianFirstResponseTimeDays : typeof issueMetrics?.averageFirstResponseTimeDays === "number" ? issueMetrics.averageFirstResponseTimeDays : null)} days median` },
-        { label: "Closure rate", key: "closureRate", raw: formatPercentValue(issueMetrics?.closureRate) },
-        { label: "Healthy closure rate", key: "healthyClosureRate", raw: formatPercentValue(issueMetrics?.healthyClosureRate) },
-        { label: "Stale open issue rate", key: "staleOpenIssueRate", raw: formatPercentValue(issueMetrics?.staleOpenIssueRate) },
-        { label: "Post-close activity", key: "postCloseActivityRate", raw: formatPercentValue(issueMetrics?.postCloseActivityRate) },
-        { label: "Sample coverage", key: "sampleSize", raw: formatMetric(typeof issueMetrics?.totalIssuesAnalyzed === "number" ? issueMetrics.totalIssuesAnalyzed : null) },
-        { label: "Code-linked closure rate", key: "codeResolutionRate", raw: formatPercentValue(issueMetrics?.codeResolutionRate) },
-        { label: "Closed by PR rate", key: "closedByPrRate", raw: formatPercentValue(issueMetrics?.closedByPrRate ?? issueMetrics?.closedByPRRate) },
+        { label: t("detail.resolutionTime"), key: "resolutionTime", raw: `${formatMetric(typeof issueMetrics?.medianResolutionTimeDays === "number" ? issueMetrics.medianResolutionTimeDays : typeof issueMetrics?.averageResolutionTimeDays === "number" ? issueMetrics.averageResolutionTimeDays : null)} ${t("common.daysMedian")}` },
+        { label: t("detail.maintainerResponseTime"), key: "firstResponseTime", raw: `${formatMetric(typeof issueMetrics?.medianFirstResponseTimeDays === "number" ? issueMetrics.medianFirstResponseTimeDays : typeof issueMetrics?.averageFirstResponseTimeDays === "number" ? issueMetrics.averageFirstResponseTimeDays : null)} ${t("common.daysMedian")}` },
+        { label: t("detail.closureRate"), key: "closureRate", raw: formatPercentValue(issueMetrics?.closureRate) },
+        { label: t("detail.healthyClosureRate"), key: "healthyClosureRate", raw: formatPercentValue(issueMetrics?.healthyClosureRate) },
+        { label: t("detail.staleOpenIssueRate"), key: "staleOpenIssueRate", raw: formatPercentValue(issueMetrics?.staleOpenIssueRate) },
+        { label: t("detail.postCloseActivity"), key: "postCloseActivityRate", raw: formatPercentValue(issueMetrics?.postCloseActivityRate) },
+        { label: t("detail.sampleCoverage"), key: "sampleSize", raw: formatMetric(typeof issueMetrics?.totalIssuesAnalyzed === "number" ? issueMetrics.totalIssuesAnalyzed : null) },
+        { label: t("detail.codeLinkedClosureRate"), key: "codeResolutionRate", raw: formatPercentValue(issueMetrics?.codeResolutionRate) },
+        { label: t("detail.closedByPrRate"), key: "closedByPrRate", raw: formatPercentValue(issueMetrics?.closedByPrRate ?? issueMetrics?.closedByPRRate) },
       ],
     },
   ];
@@ -746,15 +752,15 @@ export default function DependencyDetailPage() {
         <div className="header-content">
           <h1>{dependency.name}</h1>
           <span className={`type-badge type-${dependency.type.toLowerCase()}`}>
-            {dependency.type === "DEPENDENCY" ? "Dependency" : "Dev Dependency"}
+            {dependency.type === "DEPENDENCY" ? t("dependency.type.dependency") : t("dependency.type.devDependency")}
           </span>
         </div>
         {analysis && (
           <button
             className="button"
-            onClick={() => exportDependencyReport(analysis, dependency.name)}
+            onClick={() => exportDependencyReport(analysis, dependency.name, language)}
           >
-            Export PDF
+            {t("common.exportPdf")}
           </button>
         )}
         <button 
@@ -766,26 +772,26 @@ export default function DependencyDetailPage() {
       </header>
 
       <article className="info-section">
-        <h2>General Information</h2>
+        <h2>{t("detail.generalInformation")}</h2>
         <div className="info-grid">
           <div className="info-item">
-            <span className="info-label">Required Version</span>
+            <span className="info-label">{t("detail.requiredVersion")}</span>
             <span className="info-value">{dependency.versionRequirement}</span>
           </div>
           <div className="info-item">
-            <span className="info-label">Type</span>
+            <span className="info-label">{t("result.type")}</span>
             <span className="info-value">
-              {dependency.type === "DEPENDENCY" ? "Dependency" : "Dev Dependency"}
+              {dependency.type === "DEPENDENCY" ? t("dependency.type.dependency") : t("dependency.type.devDependency")}
             </span>
           </div>
         </div>
       </article>
 
       <article className="metrics-section">
-        <h2>Score and Risk Level</h2>
+        <h2>{t("detail.scoreAndRisk")}</h2>
         <div className="metrics-grid">
           <div className="metric-card score-card">
-            <h3>Dependency Score</h3>
+            <h3>{t("detail.dependencyScore")}</h3>
             <div className="score-display">
               <span className="score-value">{dependency.score}</span>
               <span className="score-max">/100</span>
@@ -804,13 +810,13 @@ export default function DependencyDetailPage() {
 
           <div className="metric-card risk-card">
             <div className="metric-card-header">
-              <h3>Risk Level</h3>
+              <h3>{t("result.riskLevel")}</h3>
               <button
                 type="button"
                 className="risk-info-button"
                 onClick={() => setRiskInfoOpen(true)}
-                aria-label="Open risk level explanation"
-                title="How the risk level is determined"
+                aria-label={t("detail.openRiskExplanation")}
+                title={t("detail.riskExplanationTitle")}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
@@ -818,17 +824,17 @@ export default function DependencyDetailPage() {
               </button>
             </div>
             <p className={`risk-level ${riskClassName(dependency.riskLevel)}`}>
-              {riskLabel(dependency.riskLevel)}
+              {riskLabel(dependency.riskLevel, t)}
             </p>
             <div className="risk-description">
               {dependency.riskLevel === "LOW" && (
-                <p>This dependency presents a low risk for your project.</p>
+                <p>{t("detail.lowRiskDescription")}</p>
               )}
               {dependency.riskLevel === "MEDIUM" && (
-                <p>This dependency presents a medium risk. Check for available updates.</p>
+                <p>{t("detail.mediumRiskDescription")}</p>
               )}
               {dependency.riskLevel === "HIGH" && (
-                <p>This dependency presents a high risk. Consider updating or replacing it.</p>
+                <p>{t("detail.highRiskDescription")}</p>
               )}
             </div>
           </div>
@@ -846,14 +852,14 @@ export default function DependencyDetailPage() {
           >
             <div className="risk-modal-header">
               <div>
-                <p className="risk-modal-kicker">Risk Level Guide</p>
-                <h3 id="risk-modal-title">How the risk level is determined</h3>
+                <p className="risk-modal-kicker">{t("detail.riskGuide")}</p>
+                <h3 id="risk-modal-title">{t("detail.riskExplanationTitle")}</h3>
               </div>
               <button
                 type="button"
                 className="risk-modal-close"
                 onClick={() => setRiskInfoOpen(false)}
-                aria-label="Close risk level explanation"
+                aria-label={t("detail.closeRiskExplanation")}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -863,39 +869,38 @@ export default function DependencyDetailPage() {
 
             <div className="risk-modal-body">
               <p>
-                The risk level is based on the computed dependency score. Higher scores mean lower risk,
-                and lower scores mean higher risk.
+                {t("detail.riskModalIntro")}
               </p>
 
               <div className="risk-modal-grid">
                 <article className="risk-modal-card">
-                  <h4>Low Risk</h4>
-                  <p>Score: 80 to 100</p>
-                  <p>Usually indicates a healthy package with good GitHub and NPM signals.</p>
-                  <p>Solution: keep it updated, monitor releases, and continue normal usage.</p>
+                  <h4>{t("detail.lowRisk")}</h4>
+                  <p>{t("detail.scoreRangeLow")}</p>
+                  <p>{t("detail.lowRiskHelp")}</p>
+                  <p>{t("detail.lowRiskSolution")}</p>
                 </article>
 
                 <article className="risk-modal-card">
-                  <h4>Medium Risk</h4>
-                  <p>Score: 60 to 79</p>
-                  <p>Signals are mixed, so the dependency deserves review before relying on it heavily.</p>
-                  <p>Solution: check for newer versions, review the repository health, and test upgrades.</p>
+                  <h4>{t("detail.mediumRisk")}</h4>
+                  <p>{t("detail.scoreRangeMedium")}</p>
+                  <p>{t("detail.mediumRiskHelp")}</p>
+                  <p>{t("detail.mediumRiskSolution")}</p>
                 </article>
 
                 <article className="risk-modal-card">
-                  <h4>High Risk</h4>
-                  <p>Score: below 60</p>
-                  <p>The package looks weak or under-maintained and may be unsafe for long-term use.</p>
-                  <p>Solution: replace it if possible, pin versions carefully, or isolate its usage.</p>
+                  <h4>{t("detail.highRisk")}</h4>
+                  <p>{t("detail.scoreRangeHigh")}</p>
+                  <p>{t("detail.highRiskHelp")}</p>
+                  <p>{t("detail.highRiskSolution")}</p>
                 </article>
               </div>
 
               <div className="risk-modal-notes">
-                <h4>What influences the score</h4>
+                <h4>{t("detail.scoreInfluences")}</h4>
                 <ul>
-                  <li>NPM metadata such as README, license, repository presence, downloads, and release age.</li>
-                  <li>GitHub repository signals such as stars, forks, watchers, contributors, and age.</li>
-                  <li>Issue metrics such as open issues, closed issues, and warning flags.</li>
+                  <li>{t("detail.influenceNpm")}</li>
+                  <li>{t("detail.influenceGithub")}</li>
+                  <li>{t("detail.influenceIssues")}</li>
                 </ul>
               </div>
             </div>
@@ -903,7 +908,7 @@ export default function DependencyDetailPage() {
         </div>
       )}
 
-      <div className="detail-tabs" role="tablist" aria-label="Dependency detail views">
+      <div className="detail-tabs" role="tablist" aria-label={t("detail.detailViews")}>
         <button
           type="button"
           role="tab"
@@ -911,7 +916,7 @@ export default function DependencyDetailPage() {
           className={`detail-tab ${activeTab === "signals" ? "is-active" : ""}`}
           onClick={() => setActiveTab("signals")}
         >
-          Signals
+          {t("detail.signals")}
         </button>
         <button
           type="button"
@@ -920,7 +925,7 @@ export default function DependencyDetailPage() {
           className={`detail-tab ${activeTab === "score" ? "is-active" : ""}`}
           onClick={() => setActiveTab("score")}
         >
-          Score Breakdown
+          {t("detail.scoreBreakdown")}
         </button>
         <button
           type="button"
@@ -929,7 +934,7 @@ export default function DependencyDetailPage() {
           className={`detail-tab ${activeTab === "relationships" ? "is-active" : ""}`}
           onClick={() => setActiveTab("relationships")}
         >
-          Relationships
+          {t("detail.relationships")}
         </button>
         <button
           type="button"
@@ -938,7 +943,7 @@ export default function DependencyDetailPage() {
           className={`detail-tab ${activeTab === "issues" ? "is-active" : ""}`}
           onClick={() => setActiveTab("issues")}
         >
-          Issues
+          {t("detail.issues")}
         </button>
       </div>
 
@@ -946,7 +951,7 @@ export default function DependencyDetailPage() {
       <article className="github-section">
         <div className="relationship-section-heading">
           <div>
-            <h2>Dependency Relationships</h2>
+            <h2>{t("detail.dependencyRelationships")}</h2>
             <p>{relationshipStatus.message}</p>
           </div>
           <span className={`relationship-status-badge ${relationshipStatus.className}`}>
@@ -955,35 +960,35 @@ export default function DependencyDetailPage() {
         </div>
         <div className="relationship-summary-grid">
           <div className="relationship-summary-card relationship-summary-critical">
-            <span>Known incompatibilities</span>
+            <span>{t("detail.knownIncompatibilities")}</span>
             <strong>{showRelationshipCounts ? relationshipCounts.known : "-"}</strong>
           </div>
           <div className="relationship-summary-card relationship-summary-warning">
-            <span>Possible conflicts</span>
+            <span>{t("detail.possibleConflicts")}</span>
             <strong>{showRelationshipCounts ? relationshipCounts.possible : "-"}</strong>
           </div>
           <div className="relationship-summary-card relationship-summary-info">
-            <span>Integration mentions</span>
+            <span>{t("detail.integrationMentions")}</span>
             <strong>{showRelationshipCounts ? relationshipCounts.mentions : "-"}</strong>
           </div>
           <div className="relationship-summary-card">
-            <span>No evidence found</span>
+            <span>{t("detail.noEvidenceFound")}</span>
             <strong>{showRelationshipCounts ? unknownRelationshipCount : "-"}</strong>
           </div>
         </div>
         {relationshipAnalysisPending && (
           <p className="relationship-status-note">
-            Relationship results for this dependency are not ready yet.
+            {t("detail.relationshipNotReady")}
           </p>
         )}
         {!relationshipAnalysisPending && !relationshipChecksAvailable && (
           <p className="relationship-status-note">
-            No dependency-specific relationship checks were saved. This usually means this dependency had no repository data available for relationship scanning.
+            {t("detail.noRelationshipChecksSaved")}
           </p>
         )}
         {showRelationshipCounts && unknownRelationshipCount > 0 && (
           <p className="relationship-muted-note">
-            {unknownRelationshipCount} checked dependencies had no issue evidence for this package.
+            {t("detail.noIssueEvidenceCount", { count: unknownRelationshipCount })}
           </p>
         )}
         {visibleRelationships.length > 0 ? (
@@ -999,7 +1004,7 @@ export default function DependencyDetailPage() {
                       <p className="relationship-summary">{relationship.summary}</p>
                     </div>
                     <span className={`relationship-badge ${relationshipClassName(relationship.relationshipType)}`}>
-                      {relationshipLabel(relationship.relationshipType)}
+                      {relationshipLabel(relationship.relationshipType, t)}
                     </span>
                   </div>
 
@@ -1011,13 +1016,13 @@ export default function DependencyDetailPage() {
                             #{issue.issueNumber} {issue.title}
                           </a>
                           {issue.matchedTerms.length > 0 && (
-                            <span> Terms: {issue.matchedTerms.join(", ")}</span>
+                            <span> {t("detail.terms", { terms: issue.matchedTerms.join(", ") })}</span>
                           )}
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <div className="github-metric-value">No issue evidence links found.</div>
+                    <div className="github-metric-value">{t("detail.noIssueEvidenceLinks")}</div>
                   )}
                 </div>
               );
@@ -1026,10 +1031,10 @@ export default function DependencyDetailPage() {
         ) : (
           <div className="github-metric-value">
             {relationshipAnalysisPending
-              ? "Relationship results are not ready for this dependency yet."
+              ? t("detail.relationshipPendingEmpty")
               : relationshipChecksAvailable
-                ? "No relationship risks or integration mentions were found for this dependency."
-                : "No relationship checks are available for this dependency."}
+                ? t("detail.noRelationshipRisks")
+                : t("detail.noRelationshipChecks")}
           </div>
         )}
       </article>
@@ -1039,116 +1044,115 @@ export default function DependencyDetailPage() {
       <article className="github-section">
         <div className="section-heading">
           <div>
-            <h2>Dependency Signals</h2>
-            <p>Repository, package, and issue signals used to understand this dependency.</p>
+            <h2>{t("detail.dependencySignals")}</h2>
+            <p>{t("detail.dependencySignalsCopy")}</p>
           </div>
         </div>
 
         <div className="signal-stat-grid">
           <div className="signal-stat-card">
-            <span>Weekly downloads</span>
+            <span>{t("detail.weeklyDownloads")}</span>
             <strong>{formatMetric(typeof npmMetrics?.weeklyDownloads === "number" ? npmMetrics.weeklyDownloads : null)}</strong>
           </div>
           <div className="signal-stat-card">
-            <span>Stars</span>
+            <span>{t("result.stars")}</span>
             <strong>{formatMetric(typeof githubMetrics?.stars === "number" ? githubMetrics.stars : null)}</strong>
           </div>
           <div className="signal-stat-card">
-            <span>Repository issues</span>
+            <span>{t("detail.repositoryIssues")}</span>
             <strong>{formatMetric(typeof githubMetrics?.issues === "number" ? githubMetrics.issues : null)}</strong>
           </div>
           <div className="signal-stat-card">
-            <span>Latest publish age</span>
-            <strong>{formatMetric(typeof npmMetrics?.latestPublishAgeDays === "number" ? npmMetrics.latestPublishAgeDays : null)} days</strong>
+            <span>{t("detail.latestPublishAge")}</span>
+            <strong>{formatMetric(typeof npmMetrics?.latestPublishAgeDays === "number" ? npmMetrics.latestPublishAgeDays : null)} {t("common.days")}</strong>
           </div>
         </div>
 
         <div className="signals-layout">
           <div className="signal-panel signal-panel-wide">
             <div className="signal-panel-header">
-              <p>Repository</p>
+              <p>{t("detail.repository")}</p>
               {getRepositoryUrl(dependency.scoreEntry) && (
                 <a href={getRepositoryUrl(dependency.scoreEntry) ?? "#"} target="_blank" rel="noreferrer">
-                  Open repo
+                  {t("detail.openRepo")}
                 </a>
               )}
             </div>
             <div className="repository-identity">
               <strong>{getStringValue(repository?.fullName) ?? getStringValue(repository?.name) ?? "-"}</strong>
-              <span>{getStringValue(githubMetrics?.primaryLanguage) ?? "Unknown language"}</span>
+              <span>{getStringValue(githubMetrics?.primaryLanguage) ?? t("detail.unknownLanguage")}</span>
             </div>
-            <p className="signal-description">{getStringValue(repository?.description) ?? "No repository description available."}</p>
+            <p className="signal-description">{getStringValue(repository?.description) ?? t("detail.noRepositoryDescription")}</p>
             <dl className="signal-definition-grid">
               <div>
-                <dt>Owner</dt>
+                <dt>{t("detail.owner")}</dt>
                 <dd>{getStringValue(repository?.owner) ?? "-"}</dd>
               </div>
               <div>
-                <dt>Created</dt>
+                <dt>{t("common.created")}</dt>
                 <dd>{formatDate(repository?.createdAt)}</dd>
               </div>
               <div>
-                <dt>Project age</dt>
-                <dd>{formatMetric(typeof githubMetrics?.projectAgeDays === "number" ? githubMetrics.projectAgeDays : null)} days</dd>
+                <dt>{t("detail.projectAge")}</dt>
+                <dd>{formatMetric(typeof githubMetrics?.projectAgeDays === "number" ? githubMetrics.projectAgeDays : null)} {t("common.days")}</dd>
               </div>
             </dl>
             <div className="signal-mini-metrics">
-              <div><span>Watchers</span><strong>{formatMetric(typeof githubMetrics?.watchers === "number" ? githubMetrics.watchers : null)}</strong></div>
-              <div><span>Forks</span><strong>{formatMetric(typeof githubMetrics?.forks === "number" ? githubMetrics.forks : null)}</strong></div>
-              <div><span>Pull requests</span><strong>{formatMetric(typeof githubMetrics?.pullRequests === "number" ? githubMetrics.pullRequests : null)}</strong></div>
-              <div><span>Contributors</span><strong>{formatMetric(typeof githubMetrics?.contributors === "number" ? githubMetrics.contributors : null)}</strong></div>
+              <div><span>{t("detail.watchers")}</span><strong>{formatMetric(typeof githubMetrics?.watchers === "number" ? githubMetrics.watchers : null)}</strong></div>
+              <div><span>{t("result.forks")}</span><strong>{formatMetric(typeof githubMetrics?.forks === "number" ? githubMetrics.forks : null)}</strong></div>
+              <div><span>{t("detail.pullRequests")}</span><strong>{formatMetric(typeof githubMetrics?.pullRequests === "number" ? githubMetrics.pullRequests : null)}</strong></div>
+              <div><span>{t("detail.contributors")}</span><strong>{formatMetric(typeof githubMetrics?.contributors === "number" ? githubMetrics.contributors : null)}</strong></div>
             </div>
           </div>
 
           <div className="signal-panel signal-panel-side">
             <div className="signal-panel-header">
-              <p>Package health</p>
+              <p>{t("detail.packageHealth")}</p>
             </div>
             <dl className="signal-list">
-              <div><dt>README</dt><dd>{formatBoolean(npmMetrics?.hasReadme)}</dd></div>
-              <div><dt>License</dt><dd>{getStringValue(githubMetrics?.license) ?? formatBoolean(npmMetrics?.hasLicense)}</dd></div>
-              <div><dt>Repository field</dt><dd>{formatBoolean(npmMetrics?.hasRepository)}</dd></div>
-              <div><dt>Versions</dt><dd>{formatMetric(typeof npmMetrics?.versionCount === "number" ? npmMetrics.versionCount : null)}</dd></div>
-              <div><dt>Package age</dt><dd>{formatMetric(typeof npmMetrics?.packageAgeDays === "number" ? npmMetrics.packageAgeDays : null)} days</dd></div>
-              <div><dt>Dependencies</dt><dd>{formatMetric(typeof npmMetrics?.dependencyCount === "number" ? npmMetrics.dependencyCount : null)}</dd></div>
-              <div><dt>Dev dependencies</dt><dd>{formatMetric(typeof npmMetrics?.devDependencyCount === "number" ? npmMetrics.devDependencyCount : null)}</dd></div>
+              <div><dt>README</dt><dd>{formatBoolean(npmMetrics?.hasReadme, t)}</dd></div>
+              <div><dt>{t("detail.license")}</dt><dd>{getStringValue(githubMetrics?.license) ?? formatBoolean(npmMetrics?.hasLicense, t)}</dd></div>
+              <div><dt>{t("detail.repositoryField")}</dt><dd>{formatBoolean(npmMetrics?.hasRepository, t)}</dd></div>
+              <div><dt>{t("detail.versions")}</dt><dd>{formatMetric(typeof npmMetrics?.versionCount === "number" ? npmMetrics.versionCount : null)}</dd></div>
+              <div><dt>{t("detail.packageAge")}</dt><dd>{formatMetric(typeof npmMetrics?.packageAgeDays === "number" ? npmMetrics.packageAgeDays : null)} {t("common.days")}</dd></div>
+              <div><dt>{t("common.dependencies")}</dt><dd>{formatMetric(typeof npmMetrics?.dependencyCount === "number" ? npmMetrics.dependencyCount : null)}</dd></div>
+              <div><dt>{t("detail.devDependencies")}</dt><dd>{formatMetric(typeof npmMetrics?.devDependencyCount === "number" ? npmMetrics.devDependencyCount : null)}</dd></div>
             </dl>
           </div>
 
           <div className="signal-panel signal-panel-tags">
             <div className="signal-panel-header">
-              <p>Ecosystem tags</p>
+              <p>{t("detail.ecosystemTags")}</p>
             </div>
-            <div className="signal-chip-group-label">Topics</div>
+            <div className="signal-chip-group-label">{t("detail.topics")}</div>
             <div className="signal-chip-list">
               {topics.length > 0 ? topics.map((topic) => (
                 <span className="signal-chip" key={topic}>{topic}</span>
-              )) : <span className="signal-empty">No topics found</span>}
+              )) : <span className="signal-empty">{t("detail.noTopics")}</span>}
             </div>
-            <div className="signal-chip-group-label">Languages</div>
+            <div className="signal-chip-group-label">{t("detail.languages")}</div>
             <div className="signal-chip-list">
               {languages.length > 0 ? languages.map((language) => (
                 <span className="signal-chip" key={language}>{language}</span>
-              )) : <span className="signal-empty">No languages found</span>}
+              )) : <span className="signal-empty">{t("detail.noLanguages")}</span>}
             </div>
           </div>
 
           <div className="signal-panel signal-panel-issue">
             <div className="signal-panel-header">
-              <p>Sampled issue window</p>
+              <p>{t("detail.sampledIssueWindow")}</p>
             </div>
             <p className="signal-description">
-              These numbers come from the issue-mining sample, not the repository lifetime totals.
-              The miner uses a balanced sample of recent open, recent closed, older closed, and old open issues.
+              {t("detail.sampledIssueWindowCopy")}
             </p>
             <dl className="signal-list">
-              <div><dt>Sampled open issues</dt><dd>{formatMetric(typeof issueMetrics?.openIssues === "number" ? issueMetrics.openIssues : null)}</dd></div>
-              <div><dt>Sampled closed issues</dt><dd>{formatMetric(typeof issueMetrics?.closedIssues === "number" ? issueMetrics.closedIssues : null)}</dd></div>
-              <div><dt>Recent open sample</dt><dd>{formatMetric(typeof issueMetrics?.sampleRecentOpenIssues === "number" ? issueMetrics.sampleRecentOpenIssues : null)}</dd></div>
-              <div><dt>Recent closed sample</dt><dd>{formatMetric(typeof issueMetrics?.sampleRecentClosedIssues === "number" ? issueMetrics.sampleRecentClosedIssues : null)}</dd></div>
-              <div><dt>Older closed sample</dt><dd>{formatMetric(typeof issueMetrics?.sampleOlderClosedIssues === "number" ? issueMetrics.sampleOlderClosedIssues : null)}</dd></div>
-              <div><dt>Old open sample</dt><dd>{formatMetric(typeof issueMetrics?.sampleOldOpenIssues === "number" ? issueMetrics.sampleOldOpenIssues : null)}</dd></div>
-              <div><dt>Warnings</dt><dd>{warnings.length}</dd></div>
+              <div><dt>{t("detail.sampledOpenIssues")}</dt><dd>{formatMetric(typeof issueMetrics?.openIssues === "number" ? issueMetrics.openIssues : null)}</dd></div>
+              <div><dt>{t("detail.sampledClosedIssues")}</dt><dd>{formatMetric(typeof issueMetrics?.closedIssues === "number" ? issueMetrics.closedIssues : null)}</dd></div>
+              <div><dt>{t("detail.recentOpenSample")}</dt><dd>{formatMetric(typeof issueMetrics?.sampleRecentOpenIssues === "number" ? issueMetrics.sampleRecentOpenIssues : null)}</dd></div>
+              <div><dt>{t("detail.recentClosedSample")}</dt><dd>{formatMetric(typeof issueMetrics?.sampleRecentClosedIssues === "number" ? issueMetrics.sampleRecentClosedIssues : null)}</dd></div>
+              <div><dt>{t("detail.olderClosedSample")}</dt><dd>{formatMetric(typeof issueMetrics?.sampleOlderClosedIssues === "number" ? issueMetrics.sampleOlderClosedIssues : null)}</dd></div>
+              <div><dt>{t("detail.oldOpenSample")}</dt><dd>{formatMetric(typeof issueMetrics?.sampleOldOpenIssues === "number" ? issueMetrics.sampleOldOpenIssues : null)}</dd></div>
+              <div><dt>{t("detail.warnings")}</dt><dd>{warnings.length}</dd></div>
             </dl>
             {warnings.length > 0 ? (
               <ul className="signal-warning-list">
@@ -1157,7 +1161,7 @@ export default function DependencyDetailPage() {
                 ))}
               </ul>
             ) : (
-              <p className="signal-empty">No warnings reported</p>
+              <p className="signal-empty">{t("detail.noWarnings")}</p>
             )}
           </div>
         </div>
@@ -1168,19 +1172,19 @@ export default function DependencyDetailPage() {
       <article className="github-section">
         <div className="section-heading">
           <div>
-            <h2>Score Breakdown</h2>
-            <p>How this dependency score is built from package, repository, and sampled issue signals.</p>
+            <h2>{t("detail.scoreBreakdown")}</h2>
+            <p>{t("detail.scoreBreakdownCopy")}</p>
           </div>
         </div>
 
         <div className="score-breakdown-hero">
           <div>
-            <span>Overall dependency score</span>
+            <span>{t("detail.overallDependencyScore")}</span>
             <strong>{dependency.score}/100</strong>
           </div>
           <div>
-            <span>Risk level</span>
-            <strong className={riskClassName(dependency.riskLevel)}>{riskLabel(dependency.riskLevel)}</strong>
+            <span>{t("result.riskLevel")}</span>
+            <strong className={riskClassName(dependency.riskLevel)}>{riskLabel(dependency.riskLevel, t)}</strong>
           </div>
         </div>
 
@@ -1197,18 +1201,18 @@ export default function DependencyDetailPage() {
                     <p>{item.description}</p>
                   </div>
                   <div className="score-breakdown-value">
-                    <strong>{formatScoreValue(item.score)}</strong>
-                    <span>{Math.round(item.weight * 100)}% weight</span>
+                    <strong>{formatScoreValue(item.score, t)}</strong>
+                    <span>{Math.round(item.weight * 100)}% {t("common.weight")}</span>
                   </div>
                 </div>
                 <div className="score-breakdown-bar" aria-hidden="true">
                   <div style={{ width: `${barWidth}%` }}></div>
                 </div>
                 <div className="score-breakdown-footer">
-                  <span>Contribution: {contribution ?? "-"} points</span>
+                  <span>{t("detail.contribution", { points: contribution ?? "-" })}</span>
                 </div>
                 <details className="score-input-details">
-                  <summary>Show scoring inputs</summary>
+                  <summary>{t("detail.showScoringInputs")}</summary>
                   <div className="score-input-grid">
                     {item.inputs.map((input) => {
                       const normalizedValue = getNumberValue(normalizedInputs, input.key);
@@ -1220,7 +1224,7 @@ export default function DependencyDetailPage() {
                             <span>{input.raw}</span>
                           </div>
                           <span className={`score-input-signal ${scoreSignalClassName(normalizedValue)}`}>
-                            {scoreSignalLabel(normalizedValue)}
+                            {scoreSignalLabel(normalizedValue, t)}
                           </span>
                           <span className="score-input-score">
                             {typeof normalizedValue === "number" ? `${normalizedValue}/100` : "-"}
@@ -1237,16 +1241,16 @@ export default function DependencyDetailPage() {
 
         <article className="score-relationship-note">
           <div>
-            <h3>Relationship signals</h3>
+            <h3>{t("result.relationshipSignals")}</h3>
             <p>
-              Relationship analysis is shown separately. It is not currently included in the computed dependency score.
+              {t("detail.relationshipSignalsCopy")}
             </p>
           </div>
           <div className="score-relationship-counts">
-            <span>{relationshipCounts.known} known</span>
-            <span>{relationshipCounts.possible} possible</span>
-            <span>{relationshipCounts.mentions} mentions</span>
-            <span>{relationshipSignalCount} total</span>
+            <span>{relationshipCounts.known} {t("detail.known")}</span>
+            <span>{relationshipCounts.possible} {t("detail.possible")}</span>
+            <span>{relationshipCounts.mentions} {t("detail.mentions")}</span>
+            <span>{relationshipSignalCount} {t("detail.total")}</span>
           </div>
         </article>
       </article>
@@ -1255,34 +1259,34 @@ export default function DependencyDetailPage() {
       {activeTab === "issues" && (
       <article className="github-section">
         <h2>
-          Issue Activity <a href="#issue-activity-note" className="footnote-link">*</a>
+          {t("detail.issueActivity")} <a href="#issue-activity-note" className="footnote-link">*</a>
           {selectedWeek && (
                 <button type="button" className="filter-clear-button" onClick={() => setSelectedWeek(null)}>
-                  Clear week filter ({selectedWeek})
+                  {t("detail.clearWeekFilter", { value: selectedWeek })}
                 </button>
               )}
               {selectedCloserCategory && (
                 <button type="button" className="filter-clear-button" onClick={() => setSelectedCloserCategory(null)}>
-                  Clear closer filter ({selectedCloserCategory})
+                  {t("detail.clearCloserFilter", { value: selectedCloserCategory })}
                 </button>
               )}
               {selectedActivityBucket && (
                 <button type="button" className="filter-clear-button" onClick={() => setSelectedActivityBucket(null)}>
-                  Clear activity filter ({selectedActivityBucket})
+                  {t("detail.clearActivityFilter", { value: selectedActivityBucket })}
                 </button>
               )}
               {selectedCloseReason && (
                 <button type="button" className="filter-clear-button" onClick={() => setSelectedCloseReason(null)}>
-                  Clear reason filter ({selectedCloseReason})
+                  {t("detail.clearReasonFilter", { value: selectedCloseReason })}
                 </button>
               )}
               {selectedPostCloseActivity && (
                 <button type="button" className="filter-clear-button" onClick={() => setSelectedPostCloseActivity(null)}>
-                  Clear activity filter ({selectedPostCloseActivity})
+                  {t("detail.clearActivityFilter", { value: selectedPostCloseActivity })}
                 </button>
               )}
         </h2>
-        <div className="issue-chart-toggle" role="tablist" aria-label="Issue chart views">
+        <div className="issue-chart-toggle" role="tablist" aria-label={t("detail.issueChartViews")}>
           <button
             type="button"
             role="tab"
@@ -1290,7 +1294,7 @@ export default function DependencyDetailPage() {
             className={`issue-chart-toggle-button ${issueChartView === "activity" ? "is-active" : ""}`}
             onClick={() => setIssueChartView("activity")}
           >
-            Activity
+            {t("detail.activity")}
           </button>
           <button
             type="button"
@@ -1299,7 +1303,7 @@ export default function DependencyDetailPage() {
             className={`issue-chart-toggle-button ${issueChartView === "insights" ? "is-active" : ""}`}
             onClick={() => setIssueChartView("insights")}
           >
-            Score insights
+            {t("detail.scoreInsights")}
           </button>
         </div>
         <div className="github-metrics">
@@ -1309,7 +1313,7 @@ export default function DependencyDetailPage() {
           <div className="metric-placeholder metric-placeholder-wide">
             <div className="chart-grid">
               <div className="metric-placeholder">
-                <p>Closed By</p>
+                <p>{t("detail.closedBy")}</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -1335,7 +1339,7 @@ export default function DependencyDetailPage() {
               </div>
 
               <div className="metric-placeholder">
-                <p>Timeline Activity Level</p>
+                <p>{t("detail.timelineActivityLevel")}</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={activityBucketData} margin={isCompactCharts ? { left: -20, right: 8 } : undefined}>
@@ -1355,7 +1359,7 @@ export default function DependencyDetailPage() {
               </div>
 
               <div className="metric-placeholder">
-                <p>Close Reasons</p>
+                <p>{t("detail.closeReasons")}</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -1382,7 +1386,7 @@ export default function DependencyDetailPage() {
               </div>
 
               <div className="metric-placeholder">
-                <p>Post-Close Activity</p>
+                <p>{t("detail.postCloseActivity")}</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -1408,36 +1412,36 @@ export default function DependencyDetailPage() {
               </div>
 
               <div className="metric-placeholder">
-                <p>Time to Close</p>
+                <p>{t("detail.timeToClose")}</p>
                 <div className="stat-card-body">
                   <div className="stat-value-group">
-                    <div className="stat-value-label">Median</div>
+                    <div className="stat-value-label">{t("detail.median")}</div>
                     <div className="stat-value-number">
-                      {timeToCloseStats.median !== null ? `${timeToCloseStats.median} days` : "-"}
+                      {timeToCloseStats.median !== null ? `${timeToCloseStats.median} ${t("common.days")}` : "-"}
                     </div>
                   </div>
                   <div className="stat-value-group">
-                    <div className="stat-value-label">Average</div>
+                    <div className="stat-value-label">{t("detail.average")}</div>
                     <div className="stat-value-number">
-                      {timeToCloseStats.average !== null ? `${timeToCloseStats.average} days` : "-"}
+                      {timeToCloseStats.average !== null ? `${timeToCloseStats.average} ${t("common.days")}` : "-"}
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="metric-placeholder">
-                <p>Triage Speed</p>
+                <p>{t("detail.triageSpeed")}</p>
                 <div className="stat-card-body">
                   <div className="stat-value-group">
-                    <div className="stat-value-label">Median</div>
+                    <div className="stat-value-label">{t("detail.median")}</div>
                     <div className="stat-value-number">
-                      {triageSpeedStats.median !== null ? `${triageSpeedStats.median} days` : "-"}
+                      {triageSpeedStats.median !== null ? `${triageSpeedStats.median} ${t("common.days")}` : "-"}
                     </div>
                   </div>
                   <div className="stat-value-group">
-                    <div className="stat-value-label">Average</div>
+                    <div className="stat-value-label">{t("detail.average")}</div>
                     <div className="stat-value-number">
-                      {triageSpeedStats.average !== null ? `${triageSpeedStats.average} days` : "-"}
+                      {triageSpeedStats.average !== null ? `${triageSpeedStats.average} ${t("common.days")}` : "-"}
                     </div>
                   </div>
                 </div>
@@ -1446,7 +1450,7 @@ export default function DependencyDetailPage() {
           </div>
 
           <div className="metric-placeholder metric-placeholder-wide">
-            <p>Issues Opened vs Closed (by week)</p>
+            <p>{t("detail.issuesOpenedVsClosed")}</p>
             <div className="wide-chart-container">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={issueChartData}
@@ -1462,8 +1466,8 @@ export default function DependencyDetailPage() {
                   <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="opened" name="Opened" stroke="#2563eb" />
-                  <Line type="monotone" dataKey="closed" name="Closed" stroke="#ef4444" />
+                  <Line type="monotone" dataKey="opened" name={t("detail.opened")} stroke="#2563eb" />
+                  <Line type="monotone" dataKey="closed" name={t("detail.closed")} stroke="#ef4444" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -1474,7 +1478,7 @@ export default function DependencyDetailPage() {
           <div className="metric-placeholder metric-placeholder-wide">
             <div className="chart-grid chart-grid-insights">
               <div className="metric-placeholder">
-                <p>Resolution Funnel</p>
+                <p>{t("detail.resolutionFunnel")}</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={resolutionFunnelData}>
@@ -1489,7 +1493,7 @@ export default function DependencyDetailPage() {
               </div>
 
               <div className="metric-placeholder">
-                <p>Backlog Health</p>
+                <p>{t("detail.backlogHealth")}</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={backlogHealthData}>
@@ -1504,7 +1508,7 @@ export default function DependencyDetailPage() {
               </div>
 
               <div className="metric-placeholder">
-                <p>Resolution Time Distribution</p>
+                <p>{t("detail.resolutionTimeDistribution")}</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={resolutionDistributionData}>
@@ -1519,7 +1523,7 @@ export default function DependencyDetailPage() {
               </div>
 
               <div className="metric-placeholder">
-                <p>Maintainer Response Distribution</p>
+                <p>{t("detail.maintainerResponseDistribution")}</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={responseDistributionData}>
@@ -1534,7 +1538,7 @@ export default function DependencyDetailPage() {
               </div>
 
               <div className="metric-placeholder">
-                <p>Closure Method</p>
+                <p>{t("detail.closureMethod")}</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={closerBreakdownData} layout="vertical" margin={verticalChartMargin}>
@@ -1549,7 +1553,7 @@ export default function DependencyDetailPage() {
               </div>
 
               <div className="metric-placeholder">
-                <p>Close Reasons</p>
+                <p>{t("detail.closeReasons")}</p>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={closeReasonData} layout="vertical" margin={verticalChartMargin}>
@@ -1568,17 +1572,17 @@ export default function DependencyDetailPage() {
           )}
 
           <div className="metric-placeholder metric-placeholder-wide">
-            <p>Issue Details</p>
+            <p>{t("detail.issueDetails")}</p>
             <div className="issues-table-wrapper">
               <table className="issues-table">
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Published</th>
-                    <th>Closed At</th>
-                    <th>Close Reason</th>
-                    <th>Closer Type</th>
-                    <th>Closed By Bot</th>
+                    <th>{t("detail.published")}</th>
+                    <th>{t("detail.closedAt")}</th>
+                    <th>{t("detail.closeReason")}</th>
+                    <th>{t("detail.closerType")}</th>
+                    <th>{t("detail.closedByBot")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1607,7 +1611,7 @@ export default function DependencyDetailPage() {
                         <td>{formatDate(summary.closedAt)}</td>
                         <td>{summary.stateReason ?? "-"}</td>
                         <td>{summary.closerType ?? "-"}</td>
-                        <td>{formatBoolean(summary.closedByBot)}</td>
+                        <td>{formatBoolean(summary.closedByBot, t)}</td>
                       </tr>
                     ))}
                 </tbody>
@@ -1616,7 +1620,7 @@ export default function DependencyDetailPage() {
           </div>
 
           <div className="metric-placeholder metric-placeholder-wide" id="issue-activity-note">
-            <p>* Issue activity analysis uses a balanced sample of recent open, recent closed, older closed, and old open issues.</p>
+            <p>{t("detail.issueActivityNote")}</p>
           </div>
 
         </div>

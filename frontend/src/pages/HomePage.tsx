@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
 import "./HomePage.css";
 import { sendJsonForAnalysis } from "../service/ApiService";
+import { useTranslation } from "../i18n/LanguageContext";
 
 export default function JsonDropZone() {
+  const { t } = useTranslation();
   const [dragActive, setDragActive] = useState(false);
   const [fileName, setFileName] = useState("");
   const [jsonText, setJsonText] = useState("");
@@ -26,7 +28,7 @@ export default function JsonDropZone() {
     setEmail(value);
 
     if (value !== "" && !validateEmail(value)) {
-      setEmailError("Please enter a valid email address.");
+      setEmailError(t("home.invalidEmail"));
     } else {
       setEmailError("");
     }
@@ -39,7 +41,7 @@ export default function JsonDropZone() {
     if (!file) return;
 
     if (!file.name.endsWith(".json")) {
-      setError("Please upload a .json file.");
+      setError(t("home.uploadJsonFile"));
       return;
     }
 
@@ -50,7 +52,7 @@ export default function JsonDropZone() {
         const result = event.target?.result;
 
         if (typeof result !== "string") {
-          setError("Could not read file.");
+          setError(t("home.couldNotReadFile"));
           return;
         }
 
@@ -59,12 +61,12 @@ export default function JsonDropZone() {
         setFileName(file.name);
         setJsonText(JSON.stringify(parsed, null, 2));
       } catch {
-        setError("Invalid JSON file.");
+        setError(t("home.invalidJsonFile"));
       }
     };
 
     reader.readAsText(file);
-  }, []);
+  }, [t]);
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -103,19 +105,19 @@ export default function JsonDropZone() {
     const trimmedJsonText = jsonText.trim();
 
     if (!trimmedJsonText) {
-      setError("Please upload a JSON file or paste JSON content.");
+      setError(t("home.uploadOrPaste"));
       return;
     }
 
     if (email.trim() !== "" && !validateEmail(email)) {
-      setEmailError("Please enter a valid email address.");
+      setEmailError(t("home.invalidEmail"));
       return;
     }
 
     try {
       JSON.parse(trimmedJsonText);
     } catch {
-      setError("Please enter valid JSON content.");
+      setError(t("home.enterValidJson"));
       return;
     }
 
@@ -141,9 +143,9 @@ export default function JsonDropZone() {
         )}`
       );
     } else if (result.success) {
-      setError("Upload succeeded, but no result token was returned.");
+      setError(t("home.noResultToken"));
     } else {
-      setError(result.message || "Upload failed.");
+      setError(result.message || t("home.uploadFailed"));
     }
   };
 
@@ -151,10 +153,9 @@ export default function JsonDropZone() {
     <section className="scanner-page">
       <div className="scanner-hero">
         <div>
-          <h1>Analyze a package stack before it becomes production risk.</h1>
+          <h1>{t("home.heroTitle")}</h1>
           <p className="hero-copy">
-            Upload or paste a package.json to score dependency health, mine issue signals,
-            and detect relationship risks between packages.
+            {t("home.heroCopy")}
           </p>
         </div>
       </div>
@@ -168,23 +169,23 @@ export default function JsonDropZone() {
           )}
 
           <div className="form-section emailSection">
-            <div className="section-kicker">Optional notification</div>
-            <label className="emailLabel">Email Address (optional)</label>
+            <div className="section-kicker">{t("home.optionalNotification")}</div>
+            <label className="emailLabel">{t("home.emailLabel")}</label>
             <p className="emailHelp">
-              Analysis can take a few minutes. Leave an email to get notified when the result is ready.
+              {t("home.emailHelp")}
             </p>
             <input
               type="email"
               value={email}
               onChange={handleEmailChange}
-              placeholder="example@email.com"
+              placeholder={t("home.emailPlaceholder")}
               className={`emailInput ${emailError ? "inputError" : ""}`}
             />
             {emailError && <div className="error">{emailError}</div>}
           </div>
 
           <div className="form-section">
-            <div className="section-kicker">Package JSON</div>
+            <div className="section-kicker">{t("home.packageJson")}</div>
             <div
               className={`dropZone ${dragActive ? "dropZoneActive" : ""}`}
               onDrop={handleDrop}
@@ -200,13 +201,13 @@ export default function JsonDropZone() {
               />
               <label className="label" htmlFor="json-upload">
                 <span className="upload-icon">JSON</span>
-                <span>Drop package.json here or browse</span>
+                <span>{t("home.dropJson")}</span>
               </label>
             </div>
 
             {fileName && (
               <div className="success">
-                Loaded {fileName}
+                {t("home.loadedFile", { fileName })}
               </div>
             )}
             {error && <div className="error">{error}</div>}
@@ -222,7 +223,7 @@ export default function JsonDropZone() {
 
           <div className="scanner-actions">
             <p className="submit-help">
-              Runs package, repository, issue, and relationship checks.
+              {t("home.submitHelp")}
             </p>
             <div className="scanner-action-buttons">
               <button
@@ -230,7 +231,7 @@ export default function JsonDropZone() {
                 onClick={handleSubmit}
                 disabled={loading}
               >
-                {loading ? "Analyzing..." : "Analyze Stack"}
+                {loading ? t("home.analyzing") : t("home.analyzeStack")}
               </button>
 
               {resultUrl && (
@@ -240,7 +241,7 @@ export default function JsonDropZone() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Open Result
+                  {t("home.openResult")}
                 </a>
               )}
             </div>
@@ -248,27 +249,27 @@ export default function JsonDropZone() {
         </div>
 
         <aside className="home-output-panel">
-          <h2>Analysis flow</h2>
+          <h2>{t("home.analysisFlow")}</h2>
           <div className="home-output-list">
             <div className="home-output-item">
               <span className="home-output-step signal-blue">1</span>
               <div>
-                <strong>Resolve packages</strong>
-                <p>Map each package to its package registry metadata and source repository.</p>
+                <strong>{t("home.resolvePackages")}</strong>
+                <p>{t("home.resolvePackagesCopy")}</p>
               </div>
             </div>
             <div className="home-output-item">
               <span className="home-output-step signal-orange">2</span>
               <div>
-                <strong>Score dependency health</strong>
-                <p>Combine release freshness, usage, repository activity, and issue-resolution behavior.</p>
+                <strong>{t("home.scoreDependencyHealth")}</strong>
+                <p>{t("home.scoreDependencyHealthCopy")}</p>
               </div>
             </div>
             <div className="home-output-item">
               <span className="home-output-step signal-green">3</span>
               <div>
-                <strong>Check package relationships</strong>
-                <p>Look for issue evidence that packages conflict, integrate poorly, or are commonly used together.</p>
+                <strong>{t("home.checkRelationships")}</strong>
+                <p>{t("home.checkRelationshipsCopy")}</p>
               </div>
             </div>
           </div>

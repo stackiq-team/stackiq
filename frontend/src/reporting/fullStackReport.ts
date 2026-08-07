@@ -13,6 +13,7 @@ import {
   safeFilePart,
   saveReport,
 } from "./reportUtils";
+import { defaultLanguage, translate, type Language } from "../i18n/translations";
 
 type Analysis = AnalysisLookupResponse["analysis"];
 type ScoreEntry = NonNullable<Analysis["result"]>["dependencyScores"][number];
@@ -121,25 +122,27 @@ function missingDataRows(analysis: Analysis, scoresByDependencyId: Map<string, S
   });
 }
 
-export function exportFullStackReport(analysis: Analysis) {
+export function exportFullStackReport(analysis: Analysis, language: Language = defaultLanguage) {
+  const tr = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) =>
+    translate(language, key, params);
   const result = analysis.result;
   const doc = createReport(
     "StackIQ Full Stack Report",
-    `Result token: ${analysis.resultToken}`
+    tr("result.token", { token: analysis.resultToken })
   );
 
   let y = 36;
 
   if (!result) {
-    y = addSectionTitle(doc, "Analysis Status", y);
+    y = addSectionTitle(doc, tr("common.status"), y);
     y = addKeyValueGrid(doc, [
-      ["Status", analysis.status],
-      ["Created", formatDate(analysis.createdAt)],
-      ["Updated", formatDate(analysis.updatedAt)],
-      ["Dependencies", analysis.dependencies.length],
+      [tr("common.status"), analysis.status],
+      [tr("common.created"), formatDate(analysis.createdAt)],
+      [tr("common.updated"), formatDate(analysis.updatedAt)],
+      [tr("common.dependencies"), analysis.dependencies.length],
     ], y);
-    y = addParagraph(doc, analysis.errorMessage ?? "This analysis does not have completed scoring results yet.", y);
-    saveReport(doc, `stackiq-analysis-${safeFilePart(analysis.resultToken)}.pdf`);
+    y = addParagraph(doc, analysis.errorMessage ?? tr("result.notReady"), y);
+    saveReport(doc, `stackiq-analysis-${safeFilePart(analysis.resultToken)}.pdf`, language);
     return;
   }
 
@@ -148,23 +151,23 @@ export function exportFullStackReport(analysis: Analysis) {
   const relationshipCounts = countRelationships(analysis.dependencyRelationships);
   const scoresByDependencyId = new Map(scores.map((score) => [score.dependency.id, score]));
 
-  y = addSectionTitle(doc, "Analysis Summary", y);
+  y = addSectionTitle(doc, tr("result.summary"), y);
   y = addKeyValueGrid(doc, [
-    ["Global score", `${result.globalScore}/100`],
-    ["Risk level", result.riskLevel],
-    ["Dependencies scored", scores.length],
-    ["Created", formatDate(analysis.createdAt)],
-    ["High risk", risks.high],
-    ["Medium risk", risks.medium],
-    ["Low risk", risks.low],
-    ["Relationship checks", analysis.dependencyRelationships.length],
+    [tr("result.globalScore"), `${result.globalScore}/100`],
+    [tr("result.riskLevel"), result.riskLevel],
+    [tr("result.dependencyScores"), scores.length],
+    [tr("common.created"), formatDate(analysis.createdAt)],
+    [tr("risk.high"), risks.high],
+    [tr("risk.medium"), risks.medium],
+    [tr("risk.low"), risks.low],
+    [tr("detail.relationships"), analysis.dependencyRelationships.length],
   ], y, 4);
   y = addParagraph(doc, result.summary, y);
 
-  y = addSectionTitle(doc, "Dependency Scores", y);
+  y = addSectionTitle(doc, tr("result.dependencyScores"), y);
   y = addTable(
     doc,
-    ["Package", "Version", "Type", "Repository", "Score", "Risk"],
+    ["Package", tr("result.version"), tr("result.type"), tr("detail.repository"), tr("result.score"), tr("result.risk")],
     scores.map((score) => [
       score.dependency.name,
       score.dependency.versionRequirement,
@@ -180,7 +183,7 @@ export function exportFullStackReport(analysis: Analysis) {
   y = addSectionTitle(doc, "Top Risks", y);
   y = addTable(
     doc,
-    ["Package", "Version", "Score", "Risk", "Repository"],
+    ["Package", tr("result.version"), tr("result.score"), tr("result.risk"), tr("detail.repository")],
     topLowestScores(scores).map((score) => [
       score.dependency.name,
       score.dependency.versionRequirement,
@@ -192,12 +195,12 @@ export function exportFullStackReport(analysis: Analysis) {
     { fontSize: 7 }
   );
 
-  y = addSectionTitle(doc, "Relationship Summary", y);
+  y = addSectionTitle(doc, tr("result.relationshipSignals"), y);
   y = addKeyValueGrid(doc, [
-    ["Known incompatibilities", relationshipCounts.known],
-    ["Possible conflicts", relationshipCounts.possible],
-    ["Integration mentions", relationshipCounts.mentions],
-    ["No evidence found", relationshipCounts.unknown],
+    [tr("detail.knownIncompatibilities"), relationshipCounts.known],
+    [tr("detail.possibleConflicts"), relationshipCounts.possible],
+    [tr("detail.integrationMentions"), relationshipCounts.mentions],
+    [tr("detail.noEvidenceFound"), relationshipCounts.unknown],
   ], y, 4);
 
   const relationshipRows = analysis.dependencyRelationships
@@ -211,9 +214,9 @@ export function exportFullStackReport(analysis: Analysis) {
     ]);
 
   if (relationshipRows.length > 0) {
-    y = addTable(doc, ["Package", "Compared with", "Signal", "Summary"], relationshipRows, y, { fontSize: 7 });
+    y = addTable(doc, ["Package", "Compared with", "Signal", tr("result.summary")], relationshipRows, y, { fontSize: 7 });
   } else {
-    y = addParagraph(doc, "No relationship risks or integration mentions were found in this analysis.", y);
+    y = addParagraph(doc, tr("detail.noRelationshipRisks"), y);
   }
 
   y = addSectionTitle(doc, "Score Category Averages", y);
@@ -293,5 +296,5 @@ export function exportFullStackReport(analysis: Analysis) {
     y
   );
 
-  saveReport(doc, `stackiq-full-report-${safeFilePart(analysis.resultToken)}.pdf`);
+  saveReport(doc, `stackiq-full-report-${safeFilePart(analysis.resultToken)}.pdf`, language);
 }
