@@ -4,6 +4,7 @@ import { fetchAnalysisByResultToken } from "../service/ApiService";
 import type { AnalysisLookupResponse } from "../service/ApiService";
 import { exportFullStackReport } from "../reporting/fullStackReport";
 import "./ResultPage.css";
+import { useTranslation, type TranslationKey } from "../i18n/LanguageContext";
 
 type AnalysisStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
@@ -11,11 +12,11 @@ type DependencyEntry = AnalysisLookupResponse["analysis"]["dependencies"][number
 type ScoreEntry = NonNullable<AnalysisLookupResponse["analysis"]["result"]>["dependencyScores"][number];
 type RelationshipEntry = AnalysisLookupResponse["analysis"]["dependencyRelationships"][number];
 
-const statusLabels: Record<AnalysisStatus, string> = {
-  PENDING: "Pending",
-  PROCESSING: "Processing",
-  COMPLETED: "Completed",
-  FAILED: "Failed",
+const statusLabelKeys: Record<AnalysisStatus, TranslationKey> = {
+  PENDING: "status.pending",
+  PROCESSING: "status.processing",
+  COMPLETED: "status.completed",
+  FAILED: "status.failed",
 };
 
 const POLLING_INTERVAL_MS = 3000;
@@ -159,31 +160,73 @@ function countRelationshipRisks(relationships: RelationshipEntry[]) {
 function relationshipSummaryLabel(
   counts: ReturnType<typeof countRelationshipRisks>,
   analysisStatus: AnalysisStatus,
-  relationshipCount: number
+  relationshipCount: number,
+  t: ReturnType<typeof useTranslation>["t"]
 ) {
-  if (analysisStatus !== "COMPLETED") return "Analysis pending";
-  if (relationshipCount === 0) return "Not checked yet";
+  if (analysisStatus !== "COMPLETED") return t("result.analysisPending");
+  if (relationshipCount === 0) return t("result.notCheckedYet");
 
   const riskCount = counts.known + counts.possible;
   const signalCount = riskCount + counts.mentions;
 
-  if (signalCount === 0) return "No signals found";
+  if (signalCount === 0) return t("result.noSignalsFound");
   if (riskCount > 0) {
-    return `${riskCount} ${riskCount === 1 ? "risk" : "risks"} found`;
+    return t("result.risksFound", {
+      count: riskCount,
+      label: t(riskCount === 1 ? "result.riskSingular" : "result.riskPlural"),
+    });
   }
-  return `${counts.mentions} ${counts.mentions === 1 ? "mention" : "mentions"} found`;
+  return t("result.mentionsFound", {
+    count: counts.mentions,
+    label: t(counts.mentions === 1 ? "result.mentionSingular" : "result.mentionPlural"),
+  });
 }
 
 function formatMetric(value: number | null | undefined) {
   return typeof value === "number" ? value.toLocaleString() : "-";
 }
 
-function dependencyStatusLabel(analysisStatus: AnalysisStatus, score?: ScoreEntry) {
-  if (score) return "Completed";
-  if (analysisStatus === "FAILED") return "Not Scored";
-  if (analysisStatus === "COMPLETED") return "Not Scored";
-  if (analysisStatus === "PROCESSING") return "Processing";
-  return "Pending";
+function translateGeneratedSummary(
+  summary: string,
+  t: ReturnType<typeof useTranslation>["t"]
+) {
+  const progressMatch = summary.match(
+    /^Analysis in progress\. Scored (\d+) of (\d+) dependencies\.$/
+  );
+  if (progressMatch) {
+    return t("result.progressScored", {
+      scored: progressMatch[1]!,
+      total: progressMatch[2]!,
+    });
+  }
+
+  const completedMatch = summary.match(
+    /^Scored (\d+) dependencies \((\d+) high risk\)\.$/
+  );
+  if (completedMatch) {
+    return t("result.completedScored", {
+      total: completedMatch[1]!,
+      highRisk: completedMatch[2]!,
+    });
+  }
+
+  if (summary === "No dependencies were scored.") {
+    return t("result.noDependenciesScored");
+  }
+
+  return summary;
+}
+
+function dependencyStatusLabel(
+  analysisStatus: AnalysisStatus,
+  score: ScoreEntry | undefined,
+  t: ReturnType<typeof useTranslation>["t"]
+) {
+  if (score) return t("result.completed");
+  if (analysisStatus === "FAILED") return t("result.notScored");
+  if (analysisStatus === "COMPLETED") return t("result.notScored");
+  if (analysisStatus === "PROCESSING") return t("status.processing");
+  return t("status.pending");
 }
 
 function dependencyStatusClassName(analysisStatus: AnalysisStatus, score?: ScoreEntry) {
@@ -202,9 +245,10 @@ function DependencyStatusBadge({
   analysisStatus: AnalysisStatus;
   score?: ScoreEntry;
 }) {
+  const { t } = useTranslation();
   return (
     <span className={`dependency-status ${dependencyStatusClassName(analysisStatus, score)}`}>
-      {dependencyStatusLabel(analysisStatus, score)}
+      {dependencyStatusLabel(analysisStatus, score, t)}
     </span>
   );
 }
@@ -214,6 +258,7 @@ function DependencyTable({
 }: {
   analysis: AnalysisLookupResponse["analysis"];
 }) {
+  const { t } = useTranslation();
   const [expandedDependencies, setExpandedDependencies] = useState<Record<string, boolean>>({});
 
   const scoresByDependencyId = new Map(
@@ -244,13 +289,13 @@ function DependencyTable({
       <table>
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Repo URL</th>
-            <th>Version</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th>Score</th>
-            <th>Risk</th>
+            <th>{t("result.name")}</th>
+            <th>{t("result.repoUrl")}</th>
+            <th>{t("result.version")}</th>
+            <th>{t("result.type")}</th>
+            <th>{t("common.status")}</th>
+            <th>{t("result.score")}</th>
+            <th>{t("result.risk")}</th>
             <th></th>
           </tr>
         </thead>
@@ -293,7 +338,7 @@ function DependencyTable({
                       type="button"
                       className={`dependency-toggle ${isExpanded ? "is-expanded" : ""}`}
                       aria-expanded={isExpanded}
-                      aria-label={`${isExpanded ? "Collapse" : "Expand"} ${dependency.name}`}
+                      aria-label={t(isExpanded ? "result.collapse" : "result.expand", { name: dependency.name })}
                       onClick={() => toggleDependency(dependency.id)}
                     >
                       <svg
@@ -320,39 +365,40 @@ function DependencyTable({
                       <div className="dependency-expanded-panel">
                         <div className="dependency-detail-strip">
                           <div className="strip-group strip-group-primary">
-                            <span>Version</span>
+                            <span>{t("result.version")}</span>
                             <strong>{dependency.versionRequirement}</strong>
                           </div>
                           <div className="strip-group">
-                            <span>Stars</span>
+                            <span>{t("result.stars")}</span>
                             <strong>{formatMetric(githubMetrics.stars)}</strong>
                           </div>
                           <div className="strip-group">
-                            <span>Forks</span>
+                            <span>{t("result.forks")}</span>
                             <strong>{formatMetric(githubMetrics.forks)}</strong>
                           </div>
                           <div className="strip-group">
-                            <span>Repo issues</span>
+                            <span>{t("result.repoIssues")}</span>
                             <strong>{formatMetric(githubMetrics.repositoryIssues)}</strong>
                           </div>
                           <div className="strip-group strip-group-wide">
-                            <span>Relationships</span>
+                            <span>{t("result.relationships")}</span>
                             <strong>
                               {relationshipSummaryLabel(
                                 relationshipCounts,
                                 analysis.status,
-                                dependencyRelationships.length
+                                dependencyRelationships.length,
+                                t
                               )}
                             </strong>
                           </div>
                           <div className="strip-group strip-group-wide">
-                            <span>Sampled issues</span>
+                            <span>{t("result.sampledIssues")}</span>
                             <strong>
                               {formatMetric(githubMetrics.openIssues)} open · {formatMetric(githubMetrics.closedIssues)} closed
                             </strong>
                           </div>
                           <Link className="dependency-strip-link" to={viewMoreLink}>
-                            Open details
+                            {t("result.openDetails")}
                           </Link>
                         </div>
                       </div>
@@ -369,6 +415,7 @@ function DependencyTable({
 }
 
 export default function ResultPage() {
+  const { language, t } = useTranslation();
   const { resultToken } = useParams();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -378,7 +425,7 @@ export default function ResultPage() {
 
   const load = useCallback(async ({ showLoading = true } = {}) => {
     if (!resultToken) {
-      setError("Missing result token in URL.");
+      setError(t("result.missingToken"));
       setLoading(false);
       setRefreshing(false);
       return;
@@ -395,7 +442,7 @@ export default function ResultPage() {
 
     if (!response.success || !response.data?.analysis) {
       setAnalysis(null);
-      setError(response.message || "Unable to load analysis.");
+      setError(response.message || t("result.unableToLoad"));
       setLoading(false);
       setRefreshing(false);
       return;
@@ -404,7 +451,7 @@ export default function ResultPage() {
     setAnalysis(response.data.analysis);
     setLoading(false);
     setRefreshing(false);
-  }, [resultToken]);
+  }, [resultToken, t]);
 
   useEffect(() => {
     void load();
@@ -429,8 +476,8 @@ export default function ResultPage() {
   if (loading) {
     return (
       <section className="result-page">
-        <h1>Analysis Result</h1>
-        <p>Loading analysis...</p>
+        <h1>{t("result.title")}</h1>
+        <p>{t("result.loading")}</p>
       </section>
     );
   }
@@ -438,14 +485,14 @@ export default function ResultPage() {
   if (error) {
     return (
       <section className="result-page">
-        <h1>Analysis Result</h1>
+        <h1>{t("result.title")}</h1>
         <p className="error-text">{error}</p>
         <div className="result-actions">
           <button className="button" onClick={() => void load()}>
-            Retry
+            {t("common.retry")}
           </button>
           <Link className="button button-secondary" to="/">
-            Back to Home
+            {t("common.backToHome")}
           </Link>
         </div>
       </section>
@@ -455,8 +502,8 @@ export default function ResultPage() {
   if (!analysis) {
     return (
       <section className="result-page">
-        <h1>Analysis Result</h1>
-        <p>No analysis found.</p>
+        <h1>{t("result.title")}</h1>
+        <p>{t("result.noAnalysis")}</p>
       </section>
     );
   }
@@ -477,19 +524,21 @@ export default function ResultPage() {
     <section className="result-page">
       <header className="result-header">
         <div>
-          <p className="result-kicker">Stack analysis</p>
-          <h1>Analysis Result</h1>
+          <p className="result-kicker">{t("result.stackAnalysis")}</p>
+          <h1>{t("result.title")}</h1>
         </div>
         <span className={`status-badge status-${analysis.status.toLowerCase()}`}>
-          {statusLabels[analysis.status]}
+          {t(statusLabelKeys[analysis.status])}
         </span>
       </header>
 
-      <p className="token-row">Result token: {analysis.resultToken}</p>
+      <p className="token-row">{t("result.token", { token: analysis.resultToken })}</p>
       {(analysis.status === "PENDING" || analysis.status === "PROCESSING") && (
         <p className="polling-row">
-          Auto-refreshing every {POLLING_INTERVAL_MS / 1000}s
-          {refreshing ? "..." : ""}
+          {t("result.autoRefreshing", {
+            seconds: POLLING_INTERVAL_MS / 1000,
+            suffix: refreshing ? "..." : "",
+          })}
         </p>
       )}
 
@@ -497,37 +546,40 @@ export default function ResultPage() {
         <>
           <div className="summary-grid">
             <article className="summary-card">
-              <h2>Global Score</h2>
+              <h2>{t("result.globalScore")}</h2>
               <p>{completedResult.globalScore}</p>
             </article>
             <article className="summary-card">
-              <h2>Risk Level</h2>
+              <h2>{t("result.riskLevel")}</h2>
               <p className={riskClassName(completedResult.riskLevel)}>
                 {completedResult.riskLevel}
               </p>
             </article>
             <article className="summary-card">
-              <h2>Total Time</h2>
+              <h2>{t("result.totalTime")}</h2>
               <p>{analysisDuration}</p>
             </article>
             <article className="summary-card">
-              <h2>Relationship Signals</h2>
+              <h2>{t("result.relationshipSignals")}</h2>
               <p>{totalRelationshipSignals}</p>
               {relationshipChecksStillUpdating && (
                 <span className="summary-card-note">
-                  Updating {analysis.dependencyRelationships.length}/{expectedRelationshipChecks} checks
+                  {t("result.updatingChecks", {
+                    current: analysis.dependencyRelationships.length,
+                    expected: expectedRelationshipChecks,
+                  })}
                 </span>
               )}
             </article>
           </div>
 
           <article className="summary-section">
-            <h2>Summary</h2>
-            <p>{completedResult.summary}</p>
+            <h2>{t("result.summary")}</h2>
+            <p>{translateGeneratedSummary(completedResult.summary, t)}</p>
           </article>
 
           <article className="summary-section">
-            <h2>Dependency Scores</h2>
+            <h2>{t("result.dependencyScores")}</h2>
             <DependencyTable analysis={analysis} />
           </article>
         </>
@@ -535,22 +587,22 @@ export default function ResultPage() {
         <>
           <div className="analysis-status-row">
             <article className="summary-section analysis-status-info">
-              <h2>{analysis.status === "FAILED" ? "Analysis Failed" : "Analysis In Progress"}</h2>
+              <h2>{analysis.status === "FAILED" ? t("result.analysisFailed") : t("result.analysisInProgress")}</h2>
               <p>
                 {analysis.result
-                  ? analysis.result.summary
-                  : "The analysis exists but results are not ready yet. Press refresh in a few moments."}
+                  ? translateGeneratedSummary(analysis.result.summary, t)
+                  : t("result.notReady")}
               </p>
             </article>
 
             <article className="summary-card analysis-status-time">
-              <h2>Elapsed Time</h2>
+              <h2>{t("result.elapsedTime")}</h2>
               <p>{analysisDuration}</p>
             </article>
           </div>
 
           <article className="summary-section">
-            <h2>Dependencies</h2>
+            <h2>{t("result.dependencies")}</h2>
             <DependencyTable analysis={analysis} />
           </article>
         </>
@@ -563,19 +615,19 @@ export default function ResultPage() {
       <div className="result-actions">
         <button
           className="button"
-          onClick={() => exportFullStackReport(analysis)}
+          onClick={() => exportFullStackReport(analysis, language)}
         >
-          Export PDF
+          {t("common.exportPdf")}
         </button>
         <button
           className="button"
           disabled={refreshing}
           onClick={() => void load({ showLoading: false })}
         >
-          {refreshing ? "Refreshing..." : "Refresh"}
+          {refreshing ? t("common.refreshing") : t("common.refresh")}
         </button>
         <Link className="button button-secondary" to="/">
-          Back to Home
+          {t("common.backToHome")}
         </Link>
       </div>
     </section>

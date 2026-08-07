@@ -45,16 +45,16 @@ import {
   type RepoLeaderboardItem,
 } from "../service/ApiService";
 import "./LeaderboardPage.css";
+import { useTranslation, type TranslationKey } from "../i18n/LanguageContext";
 
-function formatAnalysisStatus(status: string | null | undefined): string {
-  if (!status) return "Unknown";
+function statusKey(status: string | null | undefined): TranslationKey {
+  if (!status) return "common.unknown";
   const normalized = String(status).trim().toLowerCase();
-  if (normalized === "unknown") return "Unknown";
-  if (normalized === "pending") return "Pending";
-  if (normalized === "processing") return "Processing";
-  if (normalized === "completed") return "Completed";
-  if (normalized === "failed") return "Failed";
-  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
+  if (normalized === "pending") return "status.pending";
+  if (normalized === "processing") return "status.processing";
+  if (normalized === "completed") return "status.completed";
+  if (normalized === "failed") return "status.failed";
+  return "common.unknown";
 }
 
 function RepoCard({
@@ -68,19 +68,20 @@ function RepoCard({
   isSubmitting: boolean;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const scoreLabel = isSubmitting
-    ? "Analyzing…"
+    ? t("leaderboard.analyzing")
     : repo.analysisScore != null
     ? String(repo.analysisScore)
-    : "Unknown";
+    : t("common.unknown");
 
   const statusLabel = !repo.packageJsonPresent
-    ? "Unsupported format"
+    ? t("leaderboard.unsupportedFormat")
     : repo.analysisStatus
-    ? formatAnalysisStatus(repo.analysisStatus)
+    ? t(statusKey(repo.analysisStatus))
     : repo.analysisResultToken
-    ? "Pending"
-    : "Unknown";
+    ? t("status.pending")
+    : t("common.unknown");
 
   return (
     <button
@@ -93,7 +94,7 @@ function RepoCard({
         <span className="repo-name">{repo.fullName}</span>
         <span className="repo-score">{scoreLabel}</span>
       </div>
-      <div className="repo-description">{repo.description ?? "No description"}</div>
+      <div className="repo-description">{repo.description ?? t("leaderboard.noDescription")}</div>
       <div className="repo-meta">
         <span><IconStar /> {repo.stars}</span>
         <span><IconFork /> {repo.forks}</span>
@@ -102,22 +103,22 @@ function RepoCard({
       <div className="repo-scores">
         <div className="repo-score-item">
           <span className="repo-score-value">{repo.popularityScore}</span>
-          <span className="repo-score-label">Popularity</span>
+          <span className="repo-score-label">{t("leaderboard.popularity")}</span>
         </div>
         <div className="repo-score-item">
           <span className="repo-score-value">{repo.activityScore}</span>
-          <span className="repo-score-label">Activity</span>
+          <span className="repo-score-label">{t("leaderboard.activity")}</span>
         </div>
         <div className="repo-score-item">
           <span className="repo-score-value">{repo.compatibilityScore}</span>
-          <span className="repo-score-label">Compatibility</span>
+          <span className="repo-score-label">{t("leaderboard.compatibility")}</span>
         </div>
       </div>
       <div className="repo-language">
-        <span><IconTools /> {repo.primaryLanguage ?? "Unknown"}</span>
+        <span><IconTools /> {repo.primaryLanguage ?? t("common.unknown")}</span>
       </div>
       <div className="repo-status-row">
-        <span className="repo-status-value">Analysis status: {statusLabel}</span>
+        <span className="repo-status-value">{t("leaderboard.analysisStatus", { status: statusLabel })}</span>
       </div>
     </button>
   );
@@ -151,6 +152,7 @@ function RepoSection({
 }
 
 export default function LeaderboardPage() {
+  const { t } = useTranslation();
   const [leaderboards, setLeaderboards] = useState<LeaderboardLists | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,15 +168,15 @@ export default function LeaderboardPage() {
         setLeaderboards(data.data.leaderboards);
       } else {
         setLeaderboards(null);
-        setError(data.message ?? "Unable to load leaderboard");
+        setError(data.message ?? t("leaderboard.unableToLoad"));
       }
     } catch (err) {
       setLeaderboards(null);
-      setError(err instanceof Error ? err.message : "Unable to load leaderboard");
+      setError(err instanceof Error ? err.message : t("leaderboard.unableToLoad"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadLeaderboards();
@@ -201,20 +203,20 @@ export default function LeaderboardPage() {
           return;
         }
 
-        setSelectionError(result.message ?? "Unable to start repository analysis.");
+        setSelectionError(result.message ?? t("leaderboard.unableToStart"));
       } catch (err) {
-        setSelectionError(err instanceof Error ? err.message : "Unable to start repository analysis.");
+        setSelectionError(err instanceof Error ? err.message : t("leaderboard.unableToStart"));
       }
     },
-    [navigate]
+    [navigate, t]
   );
 
   return (
     <div className="leaderboard-page">
       <div className="leaderboard-header">
         <div>
-          <h1>Explore</h1>
-          <p>Explore popular repositories and inspect their scores.</p>
+          <h1>{t("leaderboard.explore")}</h1>
+          <p>{t("leaderboard.description")}</p>
         </div>
       </div>
       {loading && <div className="leaderboard-loading">Loading leaderboards…</div>}
@@ -222,7 +224,7 @@ export default function LeaderboardPage() {
       {selectionError && <div className="leaderboard-error">{selectionError}</div>}
       {leaderboards && (
         <RepoSection
-          title="Most Popular Repositories"
+          title={t("leaderboard.mostPopular")}
           repos={leaderboards.popular}
           onSelect={handleRepoSelect}
         />

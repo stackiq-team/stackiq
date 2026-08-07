@@ -13,6 +13,7 @@ import {
   safeFilePart,
   saveReport,
 } from "./reportUtils";
+import { defaultLanguage, translate, type Language } from "../i18n/translations";
 
 type Analysis = AnalysisLookupResponse["analysis"];
 type ScoreEntry = NonNullable<Analysis["result"]>["dependencyScores"][number];
@@ -129,18 +130,24 @@ function findScore(analysis: Analysis, dependencyName: string) {
   ) ?? null;
 }
 
-export function exportDependencyReport(analysis: Analysis, dependencyName: string) {
+export function exportDependencyReport(
+  analysis: Analysis,
+  dependencyName: string,
+  language: Language = defaultLanguage
+) {
+  const tr = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) =>
+    translate(language, key, params);
   const scoreEntry = findScore(analysis, dependencyName);
 
   if (!scoreEntry) {
     const doc = createReport(
       "StackIQ Dependency Report",
-      `${dependencyName} - Result token: ${analysis.resultToken}`
+      `${dependencyName} - ${tr("result.token", { token: analysis.resultToken })}`
     );
     let y = 36;
-    y = addSectionTitle(doc, "Dependency Not Scored", y);
-    addParagraph(doc, `${dependencyName} was not found in the completed dependency scores for this analysis.`, y);
-    saveReport(doc, `stackiq-${safeFilePart(dependencyName)}-${safeFilePart(analysis.resultToken)}.pdf`);
+    y = addSectionTitle(doc, tr("result.notScored"), y);
+    addParagraph(doc, `${dependencyName} ${tr("detail.dependencyNotFound")}`, y);
+    saveReport(doc, `stackiq-${safeFilePart(dependencyName)}-${safeFilePart(analysis.resultToken)}.pdf`, language);
     return;
   }
 
@@ -161,28 +168,28 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
 
   const doc = createReport(
     "StackIQ Dependency Report",
-    `${scoreEntry.dependency.name} - Result token: ${analysis.resultToken}`
+    `${scoreEntry.dependency.name} - ${tr("result.token", { token: analysis.resultToken })}`
   );
   let y = 36;
 
   y = addSectionTitle(doc, "Package Overview", y);
   y = addKeyValueGrid(doc, [
     ["Package", scoreEntry.dependency.name],
-    ["Required version", scoreEntry.dependency.versionRequirement],
-    ["Type", scoreEntry.dependency.type],
-    ["Repository", getRepositoryUrl(scoreEntry)],
+    [tr("detail.requiredVersion"), scoreEntry.dependency.versionRequirement],
+    [tr("result.type"), scoreEntry.dependency.type],
+    [tr("detail.repository"), getRepositoryUrl(scoreEntry)],
     ["Repository match", formatValue(githubMetrics?.repositoryMatchSource)],
     ["Match confidence", formatValue(githubMetrics?.repositoryMatchConfidence)],
   ], y);
 
-  y = addSectionTitle(doc, "Score Breakdown", y);
+  y = addSectionTitle(doc, tr("detail.scoreBreakdown"), y);
   y = addKeyValueGrid(doc, [
-    ["Overall dependency score", `${scoreEntry.score}/100`],
-    ["Risk level", scoreEntry.riskLevel],
-    ["Package health", score(scoreEntry.popularityScore)],
-    ["Repository health", score(scoreEntry.maintenanceScore)],
-    ["Issue resolution", score(scoreEntry.resolutionQualityScore)],
-    ["Relationship signals", known + possible + mentions],
+    [tr("detail.overallDependencyScore"), `${scoreEntry.score}/100`],
+    [tr("result.riskLevel"), scoreEntry.riskLevel],
+    [tr("detail.packageHealth"), score(scoreEntry.popularityScore)],
+    [tr("detail.repositoryHealth"), score(scoreEntry.maintenanceScore)],
+    [tr("detail.issueResolution"), score(scoreEntry.resolutionQualityScore)],
+    [tr("result.relationshipSignals"), known + possible + mentions],
   ], y, 3);
 
   y = addParagraph(
@@ -221,7 +228,7 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
     { fontSize: 7 }
   );
 
-  y = addSectionTitle(doc, "Package Health Inputs", y);
+  y = addSectionTitle(doc, tr("detail.packageHealth"), y);
   y = addTable(
     doc,
     ["Input", "Raw value", "Normalized score"],
@@ -230,7 +237,7 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
     { fontSize: 7 }
   );
 
-  y = addSectionTitle(doc, "Repository Health Inputs", y);
+  y = addSectionTitle(doc, tr("detail.repositoryHealth"), y);
   y = addTable(
     doc,
     ["Input", "Raw value", "Normalized score"],
@@ -239,7 +246,7 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
     { fontSize: 7 }
   );
 
-  y = addSectionTitle(doc, "Issue Resolution Inputs", y);
+  y = addSectionTitle(doc, tr("detail.issueResolution"), y);
   y = addTable(
     doc,
     ["Input", "Raw value", "Normalized score"],
@@ -248,7 +255,7 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
     { fontSize: 7 }
   );
 
-  y = addSectionTitle(doc, "Repository Signals", y);
+  y = addSectionTitle(doc, tr("detail.repository"), y);
   y = addKeyValueGrid(doc, [
     ["Owner", formatValue(repository?.owner)],
     ["Name", formatValue(repository?.name)],
@@ -264,7 +271,7 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
     ["Project age", `${formatValue(githubMetrics?.projectAgeDays)} days`],
   ], y, 3);
 
-  y = addSectionTitle(doc, "Package Signals", y);
+  y = addSectionTitle(doc, tr("detail.packageHealth"), y);
   y = addKeyValueGrid(doc, [
     ["Weekly downloads", formatValue(npmMetrics?.weeklyDownloads)],
     ["Latest publish age", `${formatValue(npmMetrics?.latestPublishAgeDays)} days`],
@@ -276,7 +283,7 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
     ["Has README", formatValue(npmMetrics?.hasReadme)],
   ], y, 4);
 
-  y = addSectionTitle(doc, "Issue Resolution", y);
+  y = addSectionTitle(doc, tr("detail.issueResolution"), y);
   y = addKeyValueGrid(doc, [
     ["Sample coverage", formatValue(issueMetrics?.totalIssuesAnalyzed)],
     ["Sampled open", formatValue(issueMetrics?.openIssues)],
@@ -290,21 +297,21 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
     ["Closed by PR rate", percent(issueMetrics?.closedByPrRate ?? issueMetrics?.closedByPRRate)],
   ], y, 3);
 
-  y = addSectionTitle(doc, "Relationship Analysis", y);
+  y = addSectionTitle(doc, tr("detail.dependencyRelationships"), y);
   y = addKeyValueGrid(doc, [
     ["Checked against", relationships.length],
-    ["Known incompatibilities", known],
-    ["Possible conflicts", possible],
-    ["Integration mentions", mentions],
-    ["No evidence found", relationships.length - visibleRelationships.length],
-    ["Analysis status", analysis.status],
+    [tr("detail.knownIncompatibilities"), known],
+    [tr("detail.possibleConflicts"), possible],
+    [tr("detail.integrationMentions"), mentions],
+    [tr("detail.noEvidenceFound"), relationships.length - visibleRelationships.length],
+    [tr("leaderboard.analysisStatus", { status: "" }).replace(":", "").trim(), analysis.status],
   ], y, 3);
 
   const relationshipRows = relationshipIssueRows(relationships);
   if (relationshipRows.length > 0) {
-    y = addTable(doc, ["Compared with", "Signal", "Summary"], relationshipRows, y, { fontSize: 7 });
+    y = addTable(doc, ["Compared with", "Signal", tr("result.summary")], relationshipRows, y, { fontSize: 7 });
   } else {
-    y = addParagraph(doc, "No relationship risks or integration mentions were found for this dependency.", y);
+    y = addParagraph(doc, tr("detail.noRelationshipRisks"), y);
   }
 
   const issues = issueRows(scoreEntry.issueData);
@@ -319,5 +326,5 @@ export function exportDependencyReport(analysis: Analysis, dependencyName: strin
     addTable(doc, ["Warning"], warnings, y);
   }
 
-  saveReport(doc, `stackiq-${safeFilePart(scoreEntry.dependency.name)}-${safeFilePart(analysis.resultToken)}.pdf`);
+  saveReport(doc, `stackiq-${safeFilePart(scoreEntry.dependency.name)}-${safeFilePart(analysis.resultToken)}.pdf`, language);
 }
