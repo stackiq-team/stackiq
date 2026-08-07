@@ -59,6 +59,34 @@ export async function enqueueAnalysisJob(data: AnalysisJobData) {
   return job;
 }
 
+export async function getAnalysisQueueStatus() {
+  const counts = await analysisQueue.getJobCounts(
+    "waiting",
+    "active",
+    "completed",
+    "failed",
+    "delayed",
+    "paused"
+  );
+  const workerReplicas = positiveInteger(process.env.WORKER_REPLICAS, 5);
+  const workerConcurrency = positiveInteger(process.env.WORKER_CONCURRENCY, 2);
+
+  return {
+    queue: ANALYSIS_QUEUE_NAME,
+    capacity: {
+      workerReplicas,
+      workerConcurrency,
+      maxConcurrentAnalyses: workerReplicas * workerConcurrency,
+    },
+    jobs: counts,
+  };
+}
+
 function isUserJob(data: AnalysisJobData) {
   return !data.source || data.source === "USER_UPLOAD" || data.source === "USER_REPOSITORY";
+}
+
+function positiveInteger(value: string | number | undefined, fallback: number) {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }

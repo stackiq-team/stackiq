@@ -1,7 +1,7 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock, enqueueAnalysisJobMock } = vi.hoisted(() => ({
+const { prismaMock, enqueueAnalysisJobMock, getAnalysisQueueStatusMock } = vi.hoisted(() => ({
   prismaMock: {
     analysis: {
       create: vi.fn(),
@@ -11,6 +11,7 @@ const { prismaMock, enqueueAnalysisJobMock } = vi.hoisted(() => ({
     $queryRaw: vi.fn(),
   },
   enqueueAnalysisJobMock: vi.fn(),
+  getAnalysisQueueStatusMock: vi.fn(),
 }));
 
 vi.mock("../../db/client", () => ({
@@ -25,6 +26,7 @@ vi.mock("../../redis/client", () => ({
 
 vi.mock("../../queue/analysisQueue", () => ({
   enqueueAnalysisJob: enqueueAnalysisJobMock,
+  getAnalysisQueueStatus: getAnalysisQueueStatusMock,
 }));
 
 import { app } from "../../app";

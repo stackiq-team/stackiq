@@ -21,7 +21,6 @@ export function Header() {
             </div>
             <div className="nav-right">
                 <div className="language-switcher" role="group" aria-label={t("nav.language")}>
-                    <span>{t("nav.language")}</span>
                     <div className="language-options">
                         {(Object.keys(languageLabels) as Language[]).map((option) => (
                             <button

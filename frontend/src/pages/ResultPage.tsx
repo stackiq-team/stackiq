@@ -186,6 +186,37 @@ function formatMetric(value: number | null | undefined) {
   return typeof value === "number" ? value.toLocaleString() : "-";
 }
 
+function translateGeneratedSummary(
+  summary: string,
+  t: ReturnType<typeof useTranslation>["t"]
+) {
+  const progressMatch = summary.match(
+    /^Analysis in progress\. Scored (\d+) of (\d+) dependencies\.$/
+  );
+  if (progressMatch) {
+    return t("result.progressScored", {
+      scored: progressMatch[1]!,
+      total: progressMatch[2]!,
+    });
+  }
+
+  const completedMatch = summary.match(
+    /^Scored (\d+) dependencies \((\d+) high risk\)\.$/
+  );
+  if (completedMatch) {
+    return t("result.completedScored", {
+      total: completedMatch[1]!,
+      highRisk: completedMatch[2]!,
+    });
+  }
+
+  if (summary === "No dependencies were scored.") {
+    return t("result.noDependenciesScored");
+  }
+
+  return summary;
+}
+
 function dependencyStatusLabel(
   analysisStatus: AnalysisStatus,
   score: ScoreEntry | undefined,
@@ -544,7 +575,7 @@ export default function ResultPage() {
 
           <article className="summary-section">
             <h2>{t("result.summary")}</h2>
-            <p>{completedResult.summary}</p>
+            <p>{translateGeneratedSummary(completedResult.summary, t)}</p>
           </article>
 
           <article className="summary-section">
@@ -559,7 +590,7 @@ export default function ResultPage() {
               <h2>{analysis.status === "FAILED" ? t("result.analysisFailed") : t("result.analysisInProgress")}</h2>
               <p>
                 {analysis.result
-                  ? analysis.result.summary
+                  ? translateGeneratedSummary(analysis.result.summary, t)
                   : t("result.notReady")}
               </p>
             </article>

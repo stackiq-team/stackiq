@@ -50,8 +50,8 @@ REDIS_URL=redis://redis:6379
 BULLMQ_QUEUE_NAME=stackiq-analysis
 BACKEND_PORT=4000
 FRONTEND_PORT=5173
-WORKER_REPLICAS=2
-WORKER_CONCURRENCY=1
+WORKER_REPLICAS=5
+WORKER_CONCURRENCY=2
 DEPENDENCY_RELATIONSHIPS_ENABLED=true
 DEPENDENCY_RELATIONSHIP_EVIDENCE_LIMIT=3
 DEPENDENCY_RELATIONSHIP_DEEP_ISSUES_ENABLED=auto
@@ -92,6 +92,7 @@ After it finishes, open:
 Frontend: http://localhost:5173
 Backend:  http://localhost:4000
 Health:   http://localhost:4000/health
+Queue:    http://localhost:4000/queue/status
 ```
 
 For normal daily startup after the project has already been created once, run:
@@ -101,6 +102,21 @@ npm start
 ```
 
 `npm start` keeps your existing local database and Redis data.
+
+By default, local startup runs enough worker capacity for 10 analyses at the same time:
+
+```text
+WORKER_REPLICAS=5
+WORKER_CONCURRENCY=2
+5 workers x 2 jobs each = 10 concurrent analysis jobs
+```
+
+The startup script passes `--scale worker=$WORKER_REPLICAS` to Docker Compose because local Compose does not consistently apply the `deploy.replicas` value. To change capacity, edit `.env` and restart:
+
+```env
+WORKER_REPLICAS=10
+WORKER_CONCURRENCY=1
+```
 
 ## Command Scripts
 
@@ -224,6 +240,34 @@ Use this when you are done working and want to shut down the local app.
 ### `GET /health`
 
 Checks whether the backend can reach PostgreSQL and Redis.
+
+### `GET /queue/status`
+
+Returns BullMQ job counts and the configured analysis processing capacity.
+
+Example response:
+
+```json
+{
+  "message": "Success",
+  "status": {
+    "queue": "stackiq-analysis",
+    "capacity": {
+      "workerReplicas": 5,
+      "workerConcurrency": 2,
+      "maxConcurrentAnalyses": 10
+    },
+    "jobs": {
+      "waiting": 0,
+      "active": 0,
+      "completed": 0,
+      "failed": 0,
+      "delayed": 0,
+      "paused": 0
+    }
+  }
+}
+```
 
 ### `POST /analyses`
 

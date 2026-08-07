@@ -29,6 +29,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       BULLMQ_QUEUE_NAME: ${BULLMQ_QUEUE_NAME:-stackiq-analysis}
+      WORKER_REPLICAS: ${WORKER_REPLICAS:-5}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
       GITHUB_API_TOKEN: ${GITHUB_API_TOKEN:-}
       EXPLORE_TOP_LIMIT: ${EXPLORE_TOP_LIMIT:-3}
@@ -43,7 +44,7 @@ services:
       context: ./worker
       dockerfile: Dockerfile.dev
     deploy:
-      replicas: ${WORKER_REPLICAS:-2}
+      replicas: ${WORKER_REPLICAS:-5}
     depends_on:
       redis:
         condition: service_healthy
@@ -53,7 +54,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       BULLMQ_QUEUE_NAME: ${BULLMQ_QUEUE_NAME:-stackiq-analysis}
-      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
       WORKER_PROCESS_JOBS: "true"
       WORKER_ENABLE_SCHEDULERS: "false"
       GITHUB_API_TOKEN: ${GITHUB_API_TOKEN:-}
