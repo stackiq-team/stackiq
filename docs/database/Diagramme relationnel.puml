@@ -6,7 +6,7 @@ skinparam shadowing false
 
 class Analysis {
   +id: String
-  +email: String
+  +email: String?
   +status: AnalysisStatus
   +resultToken: String
   +errorMessage: String?
@@ -39,6 +39,129 @@ class DependencyScore {
   +dependencyId: String
   +score: Int
   +riskLevel: String
+  +popularityScore: Int?
+  +maintenanceScore: Int?
+  +resolutionQualityScore: Int?
+  +normalizedInputs: Json?
+  +githubMetrics: Json?
+  +issueMetrics: Json?
+  +issueData: Json?
+  +warnings: Json?
+  +createdAt: DateTime
+  +updatedAt: DateTime
+}
+
+class DependencyRelationship {
+  +id: String
+  +analysisId: String
+  +sourceDependencyId: String
+  +targetDependencyId: String
+  +relationshipType: String
+  +confidence: String
+  +riskAdjustment: Int
+  +summary: String
+  +evidence: Json?
+  +createdAt: DateTime
+  +updatedAt: DateTime
+}
+
+class DependencyAnalysisCache {
+  +id: String
+  +cacheKey: String
+  +ecosystem: String
+  +packageManager: String
+  +dependencyName: String
+  +versionRequirement: String?
+  +versionBucket: String?
+  +repositoryOwner: String?
+  +repositoryName: String?
+  +repositoryFullName: String?
+  +repositoryUrl: String?
+  +githubMinerRaw: Json?
+  +issuesMiningRaw: Json?
+  +issueMetrics: Json?
+  +normalizedMetrics: Json?
+  +score: Int?
+  +riskLevel: String?
+  +popularityScore: Int?
+  +maintenanceScore: Int?
+  +resolutionQualityScore: Int?
+  +warnings: Json?
+  +status: String
+  +issuesConfigHash: String
+  +cacheVersion: String
+  +createdAt: DateTime
+  +updatedAt: DateTime
+  +expiresAt: DateTime
+  +lastAccessedAt: DateTime
+}
+
+class DependencyRelationshipCache {
+  +id: String
+  +cacheKey: String
+  +sourceRepositoryFullName: String
+  +sourcePackageName: String
+  +targetPackageName: String
+  +relationshipType: String
+  +confidence: String
+  +riskAdjustment: Int
+  +summary: String
+  +evidence: Json?
+  +searchTotalCount: Int
+  +searchResultCount: Int
+  +cacheVersion: String
+  +createdAt: DateTime
+  +updatedAt: DateTime
+  +expiresAt: DateTime
+  +lastAccessedAt: DateTime
+}
+
+class StackRequestStat {
+  +id: String
+  +stackHash: String
+  +stackPayload: Json
+  +requestCount: Int
+  +createdAt: DateTime
+  +updatedAt: DateTime
+}
+
+class DependencyRequestStat {
+  +id: String
+  +dependencyName: String
+  +dependencyType: DependencyType
+  +lastVersionRequirement: String
+  +requestCount: Int
+  +createdAt: DateTime
+  +updatedAt: DateTime
+}
+
+class LeaderboardRepository {
+  +id: String
+  +owner: String
+  +name: String
+  +fullName: String
+  +url: String
+  +description: String?
+  +stars: Int
+  +forks: Int
+  +watchers: Int
+  +issues: Int
+  +pullRequests: Int
+  +license: String?
+  +primaryLanguage: String?
+  +topics: String[]
+  +repositoryCreatedAt: DateTime
+  +pushedAt: DateTime
+  +githubPopularityScore: Int
+  +githubActivityScore: Int
+  +githubCompatibilityScore: Int
+  +analysisScore: Int?
+  +analysisStatus: String?
+  +analysisResultToken: String?
+  +analysisId: String?
+  +packageJsonPresent: Boolean
+  +category: String
+  +rank: Int
   +createdAt: DateTime
   +updatedAt: DateTime
 }
@@ -55,12 +178,32 @@ enum DependencyType {
   DEV_DEPENDENCY
 }
 
-Analysis "1" --> "many" Dependency : contient
-Analysis "1" --> "0..1" AnalysisResult : produit
-AnalysisResult "1" --> "many" DependencyScore : contient
-Dependency "1" --> "many" DependencyScore : reçoit
+Analysis "1" --> "many" Dependency : contains
+Analysis "1" --> "0..1" AnalysisResult : produces
+Analysis "1" --> "many" DependencyRelationship : produces
+AnalysisResult "1" --> "many" DependencyScore : contains
+Dependency "1" --> "many" DependencyScore : receives
+Dependency "1" --> "many" DependencyRelationship : source of
+Dependency "1" --> "many" DependencyRelationship : target of
 
 Analysis --> AnalysisStatus
 Dependency --> DependencyType
+DependencyRequestStat --> DependencyType
+
+note bottom of DependencyAnalysisCache
+  Not tied to a specific Analysis.
+  Keyed by dependency + version bucket,
+  reused across analyses.
+end note
+
+note bottom of DependencyRelationshipCache
+  Not tied to a specific Analysis.
+  Keyed by source repo + source/target package.
+end note
+
+note bottom of LeaderboardRepository
+  Populated by the worker-scheduler service,
+  independent of user-submitted analyses.
+end note
 
 @enduml
