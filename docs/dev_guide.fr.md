@@ -1,4 +1,4 @@
-# Guide du développeur pour StackIQ
+# Guide développeur pour StackIQ
 
 Le but de ce guide est d'aider les développeurs à corriger des bugs ou ajouter des fonctionnalités à StackIQ.
 Il contient un guide de l'architecture de l'application et oriente les développeurs vers les bons fichiers pour les modifications courantes.
